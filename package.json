@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@google/gemini-cli": "^0.1.13",
+    "react-icons": "^5.5.0"
+  }
+}

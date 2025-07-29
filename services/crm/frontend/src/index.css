@@ -1,0 +1,211 @@
+/* Import Design Tokens */
+@import './styles/design-tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base Styles with Design Language */
+:root {
+  font-family: var(--font-family-primary);
+  line-height: var(--line-height-normal);
+  font-weight: var(--font-weight-normal);
+  color: var(--color-gray-800);
+  background-color: var(--color-bg-primary);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  width: 100%;
+  min-height: 100vh;
+  font-size: var(--font-size-base);
+  color: var(--color-gray-800);
+  background-color: var(--color-bg-primary);
+}
+
+/* Typography */
+h1 {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-gray-900);
+  line-height: var(--line-height-tight);
+}
+
+h2 {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-900);
+  line-height: var(--line-height-tight);
+}
+
+h3 {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-800);
+  line-height: var(--line-height-normal);
+}
+
+/* Links */
+a {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary-600);
+  text-decoration: none;
+  transition: color var(--transition-fast) var(--transition-timing);
+}
+a:hover {
+  color: var(--color-primary-700);
+}
+
+/* Form Elements */
+input,
+select,
+textarea {
+  background-color: var(--color-bg-primary);
+  color: var(--color-gray-800);
+  border: var(--border-width-thin) solid var(--border-color-medium);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-2) var(--spacing-3);
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  transition: border-color var(--transition-fast) var(--transition-timing);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+}
+
+/* Buttons (base reset) */
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  transition: all var(--transition-fast) var(--transition-timing);
+}
+
+/* Utility Classes */
+.text-muted {
+  color: var(--color-gray-500);
+}
+
+.text-success {
+  color: var(--color-success);
+}
+
+.text-error {
+  color: var(--color-error);
+}
+
+.text-warning {
+  color: var(--color-warning);
+}
+
+/* Status Badge Utilities */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  text-transform: capitalize;
+}
+
+.status-new {
+  background-color: var(--color-status-new-bg);
+  color: var(--color-status-new-text);
+}
+
+.status-qualified {
+  background-color: var(--color-status-qualified-bg);
+  color: var(--color-status-qualified-text);
+}
+
+.status-contacted {
+  background-color: var(--color-status-contacted-bg);
+  color: var(--color-status-contacted-text);
+}
+
+.status-proposal {
+  background-color: var(--color-status-proposal-bg);
+  color: var(--color-status-proposal-text);
+}
+
+.status-negotiation {
+  background-color: var(--color-status-negotiation-bg);
+  color: var(--color-status-negotiation-text);
+}
+
+/* Enhanced Animation Utilities */
+@keyframes slideInFromTop {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInFromBottom {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-slide-in-top {
+  animation: slideInFromTop var(--transition-normal) var(--transition-smooth);
+}
+
+.animate-slide-in-bottom {
+  animation: slideInFromBottom var(--transition-normal) var(--transition-smooth);
+}
+
+.animate-fade-in-scale {
+  animation: fadeInScale var(--transition-normal) var(--transition-smooth);
+}
+
+/* Improved Focus Styles */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+}
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  .hover\:scale-\[1\.02\]:hover {
+    transform: none;
+  }
+  
+  .hover\:shadow-lg:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+  
+  .group:hover .group-hover\:scale-110 {
+    transform: none;
+  }
+}

@@ -1,0 +1,382 @@
+/* NeuraCRM Admin Interface Improvements */
+
+/* Form field improvements - better visibility and contrast */
+.form-row input[type="text"],
+.form-row input[type="email"], 
+.form-row input[type="password"],
+.form-row input[type="url"],
+.form-row input[type="number"],
+.form-row textarea,
+.form-row select {
+    background-color: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 6px !important;
+    padding: 8px 12px !important;
+    font-size: 14px !important;
+    color: #1f2937 !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+    line-height: 1.5 !important;
+}
+
+/* Focus states for better UX */
+.form-row input[type="text"]:focus,
+.form-row input[type="email"]:focus,
+.form-row input[type="password"]:focus,
+.form-row input[type="url"]:focus,
+.form-row input[type="number"]:focus,
+.form-row textarea:focus,
+.form-row select:focus {
+    border-color: #6366f1 !important;
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
+    background-color: #f8fafc !important;
+}
+
+/* Labels improvements */
+.form-row label {
+    font-weight: 500 !important;
+    color: #374151 !important;
+    margin-bottom: 4px !important;
+    display: block !important;
+    font-size: 13px !important;
+}
+
+/* Help text styling */
+.help {
+    background-color: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 4px !important;
+    padding: 6px 10px !important;
+    margin-top: 4px !important;
+    font-size: 12px !important;
+    color: #64748b !important;
+    line-height: 1.3 !important;
+}
+
+/* Fieldset improvements */
+fieldset {
+    background-color: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    padding: 16px !important;
+    margin-bottom: 16px !important;
+}
+
+fieldset h2 {
+    background-color: #ffffff !important;
+    color: #1f2937 !important;
+    font-weight: 600 !important;
+    font-size: 15px !important;
+    padding: 6px 12px !important;
+    border-radius: 6px !important;
+    border: 1px solid #e2e8f0 !important;
+    margin: -8px 0 12px 0 !important;
+}
+
+/* Error styling */
+.errorlist {
+    background-color: #fef2f2 !important;
+    border: 1px solid #fca5a5 !important;
+    border-radius: 4px !important;
+    padding: 8px 10px !important;
+    margin: 4px 0 !important;
+    color: #dc2626 !important;
+    font-size: 12px !important;
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .form-row input[type="text"],
+[data-theme="dark"] .form-row input[type="email"],
+[data-theme="dark"] .form-row input[type="password"],
+[data-theme="dark"] .form-row input[type="url"],
+[data-theme="dark"] .form-row input[type="number"],
+[data-theme="dark"] .form-row textarea,
+[data-theme="dark"] .form-row select {
+    background-color: #1f2937 !important;
+    border-color: #4b5563 !important;
+    color: #f9fafb !important;
+}
+
+[data-theme="dark"] .form-row input[type="text"]:focus,
+[data-theme="dark"] .form-row input[type="email"]:focus,
+[data-theme="dark"] .form-row input[type="password"]:focus,
+[data-theme="dark"] .form-row input[type="url"]:focus,
+[data-theme="dark"] .form-row input[type="number"]:focus,
+[data-theme="dark"] .form-row textarea:focus,
+[data-theme="dark"] .form-row select:focus {
+    background-color: #111827 !important;
+    border-color: #6366f1 !important;
+}
+
+[data-theme="dark"] .form-row label {
+    color: #e5e7eb !important;
+}
+
+[data-theme="dark"] fieldset {
+    background-color: #111827 !important;
+    border-color: #374151 !important;
+}
+
+[data-theme="dark"] fieldset h2 {
+    background-color: #1f2937 !important;
+    color: #f9fafb !important;
+    border-color: #4b5563 !important;
+}
+
+[data-theme="dark"] .help {
+    background-color: #1f2937 !important;
+    border-color: #4b5563 !important;
+    color: #9ca3af !important;
+}
+
+/* Submit button improvements */
+.submit-row input[type="submit"] {
+    background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%) !important;
+    border: none !important;
+    border-radius: 6px !important;
+    padding: 8px 16px !important;
+    font-weight: 500 !important;
+    color: white !important;
+    font-size: 13px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.2) !important;
+}
+
+.submit-row input[type="submit"]:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Checkbox and radio improvements */
+input[type="checkbox"],
+input[type="radio"] {
+    width: 18px !important;
+    height: 18px !important;
+    margin-right: 8px !important;
+    accent-color: #6366f1 !important;
+}
+
+/* Table improvements for change lists */
+.results table {
+    background-color: #ffffff !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+.results table th {
+    background-color: #f8fafc !important;
+    color: #374151 !important;
+    font-weight: 600 !important;
+    padding: 16px !important;
+    border-bottom: 2px solid #e5e7eb !important;
+}
+
+.results table td {
+    padding: 14px 16px !important;
+    border-bottom: 1px solid #f3f4f6 !important;
+    color: #1f2937 !important;
+}
+
+.results table tr:hover {
+    background-color: #f8fafc !important;
+}
+
+[data-theme="dark"] .results table {
+    background-color: #1f2937 !important;
+}
+
+[data-theme="dark"] .results table th {
+    background-color: #111827 !important;
+    color: #e5e7eb !important;
+    border-bottom-color: #374151 !important;
+}
+
+[data-theme="dark"] .results table td {
+    border-bottom-color: #374151 !important;
+    color: #d1d5db !important;
+}
+
+[data-theme="dark"] .results table tr:hover {
+    background-color: #111827 !important;
+}
+
+/* Success messages styling */
+.messagelist .success {
+    background-color: #f0fdf4 !important;
+    border-left: 3px solid #22c55e !important;
+    color: #166534 !important;
+    padding: 10px 14px !important;
+    border-radius: 6px !important;
+    margin: 10px 0 !important;
+    box-shadow: 0 1px 2px rgba(34, 197, 94, 0.1) !important;
+    font-size: 13px !important;
+}
+
+/* Breadcrumbs improvements */
+.breadcrumbs {
+    background-color: #f8fafc !important;
+    border-radius: 6px !important;
+    padding: 8px 12px !important;
+    margin-bottom: 12px !important;
+    border: 1px solid #e2e8f0 !important;
+    font-size: 13px !important;
+}
+
+[data-theme="dark"] .breadcrumbs {
+    background-color: #1f2937 !important;
+    border-color: #374151 !important;
+}
+
+/* Module header improvements */
+.module h2 {
+    background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%) !important;
+    color: white !important;
+    border-radius: 8px 8px 0 0 !important;
+    padding: 16px 20px !important;
+    margin: 0 !important;
+    font-weight: 600 !important;
+}
+
+/* Override any remaining purple Unfold defaults */
+[class*="bg-primary"], 
+[class*="text-primary"],
+.bg-primary-500,
+.text-primary-500,
+.border-primary-500 {
+    background-color: #3b82f6 !important;
+    color: white !important;
+    border-color: #3b82f6 !important;
+}
+
+/* Sidebar active states */
+.sidebar [aria-current="page"],
+.sidebar .active {
+    background-color: #3b82f6 !important;
+    color: white !important;
+}
+
+/* Button primary overrides */
+.btn-primary,
+.button.primary,
+input[type="submit"].primary {
+    background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%) !important;
+    border-color: #3b82f6 !important;
+}
+
+/* Link colors */
+a.primary,
+.link-primary {
+    color: #3b82f6 !important;
+}
+
+a.primary:hover,
+.link-primary:hover {
+    color: #2563eb !important;
+}
+
+/* Tab active states */
+.nav-tabs .nav-link.active {
+    background-color: #3b82f6 !important;
+    border-color: #3b82f6 !important;
+    color: white !important;
+}
+
+/* Progress bars */
+.progress-bar {
+    background-color: #3b82f6 !important;
+}
+
+/* Additional compact styling for professional look */
+.form-row {
+    margin-bottom: 12px !important;
+}
+
+/* Reduce spacing between form rows */
+.form-row:last-child {
+    margin-bottom: 8px !important;
+}
+
+/* More compact inline forms */
+.inline-group {
+    padding: 12px !important;
+    margin-bottom: 12px !important;
+}
+
+/* Compact table styling */
+.results table th,
+.results table td {
+    padding: 8px 12px !important;
+    font-size: 13px !important;
+}
+
+/* Smaller action buttons */
+.addlink, .changelink, .deletelink {
+    font-size: 12px !important;
+    padding: 4px 8px !important;
+    border-radius: 4px !important;
+}
+
+/* Compact sidebar */
+.sidebar-nav {
+    padding: 8px !important;
+}
+
+/* Less bulky admin interface spacing */
+.module {
+    margin-bottom: 12px !important;
+}
+
+.module h2 {
+    padding: 10px 16px !important;
+    font-size: 14px !important;
+}
+
+/* Compact datetime widgets */
+.datetime input {
+    padding: 6px 10px !important;
+    font-size: 13px !important;
+}
+
+/* Tighter checkbox/radio spacing */
+.form-row.checkboxes label,
+.form-row.radio label {
+    margin-bottom: 2px !important;
+    font-size: 13px !important;
+}
+
+/* More professional select styling */
+select {
+    height: auto !important;
+    min-height: 36px !important;
+}
+
+/* Compact filter sidebar */
+#changelist-filter {
+    padding: 12px !important;
+}
+
+#changelist-filter h3 {
+    font-size: 13px !important;
+    padding: 6px 0 !important;
+}
+
+/* Reduce excessive white space */
+.content {
+    padding: 16px !important;
+}
+
+/* More compact change list */
+#changelist .results {
+    margin-top: 10px !important;
+}
+
+/* Professional button styling in admin */
+.button, input[type="submit"], input[type="button"], .submit-row input {
+    padding: 6px 12px !important;
+    font-size: 13px !important;
+    border-radius: 4px !important;
+    margin: 2px !important;
+}

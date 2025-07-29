@@ -1,0 +1,19 @@
+# Include base requirements
+-r base.txt
+
+# Development Tools
+django-debug-toolbar>=4.4,<5.0
+
+# Testing Framework  
+pytest>=8.2,<9.0
+pytest-django>=4.8,<5.0
+factory-boy>=3.3,<4.0
+
+# Code Quality (Basic)
+ruff>=0.4,<1.0
+black>=24.4,<25.0
+
+# Code Coverage
+coverage>=7.5,<8.0
+
+requests>=2.31.0
