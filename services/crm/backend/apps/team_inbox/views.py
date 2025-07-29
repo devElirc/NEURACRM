@@ -62,58 +62,217 @@ def schema_exists(schema_name):
 # ------------------------------
 @api_view(["GET"])
 @permission_classes([AllowAny])
+# def google_callback(request):
+#     code = request.GET.get("code")
+#     if not code:
+#         return HttpResponse("<script>window.opener.postMessage('google_failed','*');window.close();</script>")
+
+#     # Step 1: Exchange code for tokens
+#     token_url = "https://oauth2.googleapis.com/token"
+#     data = {
+#         "code": code,
+#         "client_id": settings.GOOGLE_CLIENT_ID,
+#         "client_secret": settings.GOOGLE_CLIENT_SECRET,
+#         "redirect_uri": "http://127.0.0.1:8000/api/inbox/auth/google/callback",
+#         "grant_type": "authorization_code",
+#     }
+#     token_data = requests.post(token_url, data=data).json()
+#     access_token = token_data.get("access_token")
+#     refresh_token = token_data.get("refresh_token")
+
+#     if not access_token:
+#         return HttpResponse("<script>window.opener.postMessage('google_failed','*');window.close();</script>")
+
+#     # Step 2: Get user email
+#     userinfo = requests.get(
+#         "https://www.googleapis.com/oauth2/v2/userinfo",
+#         headers={"Authorization": f"Bearer {access_token}"}
+#     ).json()
+#     email = userinfo.get("email", "")
+
+#     # # Step 3: Save email + tokens in DB (example model: ChannelAccount)
+#     # from inbox.models import ChannelAccount
+
+#     # ChannelAccount.objects.update_or_create(
+#     #     email=email,
+#     #     defaults={
+#     #         "provider": "gmail",
+#     #         "access_token": access_token,
+#     #         "refresh_token": refresh_token,
+#     #         "token_expires_in": token_data.get("expires_in"),
+#     #     }
+#     # )
+
+#     # Step 4: Notify parent window and close
+#     return HttpResponse(f"""
+#         <script>
+#           window.opener.postMessage({{
+#             status: "google_connected",
+#             email: "{email}"
+#           }}, "*");
+#           window.close();
+#         </script>
+#     """)
+
+
+
+#############################
+
+# def google_callback(request):
+#     code = request.GET.get("code")
+#     print(f"code: {code}")
+    
+#     if not code:
+#         return HttpResponse("<script>window.opener.postMessage('google_failed','*');window.close();</script>")
+
+#     # Step 1: Exchange code for tokens
+#     token_url = "https://oauth2.googleapis.com/token"
+#     data = {
+#         "code": code,
+#         "client_id": settings.GOOGLE_CLIENT_ID,
+#         "client_secret": settings.GOOGLE_CLIENT_SECRET,
+#         "redirect_uri": "http://127.0.0.1:8000/api/inbox/auth/google/callback",
+#         "grant_type": "authorization_code",
+#     }
+#     token_data = requests.post(token_url, data=data).json()
+#     access_token = token_data.get("access_token")
+    
+#     print(f"token_data: {token_data}")
+
+#     if not access_token:
+#         return HttpResponse("<script>window.opener.postMessage('google_failed','*');window.close();</script>")
+
+#     # Step 2: Get user info
+#     userinfo = requests.get(
+#         "https://www.googleapis.com/oauth2/v2/userinfo",
+#         headers={"Authorization": f"Bearer {access_token}"}
+#     ).json()
+    
+#     email = userinfo.get("email", "")
+#     print(f"user email: {email}")
+
+#     # Step 3: Fetch inbox messages
+#     gmail_headers = {
+#         "Authorization": f"Bearer {access_token}"
+#     }
+
+#     # Get list of messages
+#     messages_response = requests.get(
+#         "https://gmail.googleapis.com/gmail/v1/users/me/messages",
+#         headers=gmail_headers
+#     )
+#     messages_data = messages_response.json()
+#     messages = messages_data.get("messages", [])
+
+#     print(f"messages: {messages}")
+
+#     inbox_preview = []
+
+#     # Get details for first 5 messages
+#     for msg in messages[:5]:
+#         msg_id = msg["id"]
+#         msg_detail_response = requests.get(
+#             f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}",
+#             headers=gmail_headers
+#         )
+#         msg_detail = msg_detail_response.json()
+
+#         payload = msg_detail.get("payload", {})
+#         headers = payload.get("headers", [])
+
+#         subject = next((h["value"] for h in headers if h["name"] == "Subject"), "(No Subject)")
+#         from_email = next((h["value"] for h in headers if h["name"] == "From"), "(No From)")
+
+#         inbox_preview.append(f"<li><strong>{subject}</strong> - {from_email}</li>")
+
+#     # Step 4: Show inbox preview in browser
+#     return HttpResponse(f"""
+#         <html>
+#         <head><title>Inbox Preview</title></head>
+#         <body>
+#             <script>
+#               window.opener.postMessage({{status:"google_connected", email:"{email}"}}, "*");
+#               window.close();
+#             </script>
+#             <h3>Latest Emails for {email}:</h3>
+#             <ul>
+#                 {''.join(inbox_preview)}
+#             </ul>
+#         </body>
+#         </html>
+#     """)
+
+
+################################
+
 def google_callback(request):
+    print("🔥 google_callback HIT", flush=True)
     code = request.GET.get("code")
+    print(f"🔥 Received code: {code}", flush=True)
+
+    # Test flow
+    if code == "test":
+        return HttpResponse("""
+            <script>
+              console.log("🔥 Test callback triggered");
+              window.opener?.postMessage(JSON.stringify({
+                status: "gmail_connected",
+                email: "test@example.com"
+              }), "*");
+              window.close();
+            </script>
+        """)
+
     if not code:
-        return HttpResponse("<script>window.opener.postMessage('google_failed','*');window.close();</script>")
+        return HttpResponse("""
+            <script>
+              console.log("❌ No code received");
+              window.opener?.postMessage(JSON.stringify({ status: "gmail_failed", email: "" }), "*");
+              window.close();
+            </script>
+        """)
 
-    # Step 1: Exchange code for tokens
-    token_url = "https://oauth2.googleapis.com/token"
-    data = {
-        "code": code,
-        "client_id": settings.GOOGLE_CLIENT_ID,
-        "client_secret": settings.GOOGLE_CLIENT_SECRET,
-        "redirect_uri": "http://127.0.0.1:8000/api/inbox/auth/google/callback",
-        "grant_type": "authorization_code",
-    }
-    token_data = requests.post(token_url, data=data).json()
-    access_token = token_data.get("access_token")
-    refresh_token = token_data.get("refresh_token")
+    # Exchange code for token
+    token_res = requests.post(
+        "https://oauth2.googleapis.com/token",
+        data={
+            "code": code,
+            "client_id": settings.GOOGLE_CLIENT_ID,
+            "client_secret": settings.GOOGLE_CLIENT_SECRET,
+            "redirect_uri": "http://127.0.0.1:8000/api/inbox/auth/google/callback",
+            "grant_type": "authorization_code",
+        },
+    ).json()
 
+    access_token = token_res.get("access_token")
     if not access_token:
-        return HttpResponse("<script>window.opener.postMessage('google_failed','*');window.close();</script>")
+        return HttpResponse(f"""
+            <script>
+              window.opener?.postMessage(
+                JSON.stringify({{ status: "gmail_failed", email: "" }}),
+                "*"
+              );
+              window.close();
+            </script>
+        """)
 
-    # Step 2: Get user email
+    # Get user info
     userinfo = requests.get(
         "https://www.googleapis.com/oauth2/v2/userinfo",
-        headers={"Authorization": f"Bearer {access_token}"}
+        headers={"Authorization": f"Bearer {access_token}"},
     ).json()
+
     email = userinfo.get("email", "")
 
-    # # Step 3: Save email + tokens in DB (example model: ChannelAccount)
-    # from inbox.models import ChannelAccount
-
-    # ChannelAccount.objects.update_or_create(
-    #     email=email,
-    #     defaults={
-    #         "provider": "gmail",
-    #         "access_token": access_token,
-    #         "refresh_token": refresh_token,
-    #         "token_expires_in": token_data.get("expires_in"),
-    #     }
-    # )
-
-    # Step 4: Notify parent window and close
     return HttpResponse(f"""
         <script>
-          window.opener.postMessage({{
-            status: "google_connected",
-            email: "{email}"
-          }}, "*");
+          window.opener?.postMessage(
+            JSON.stringify({{"status": "gmail_connected", "email": "{email}"}}),
+            "*"
+          );
           window.close();
         </script>
     """)
-
 
 # ------------------------------
 # Message ViewSet (tenant scoped)

@@ -339,11 +339,15 @@ export interface EmailChannel {
   id: string;
   name: string;
   email: string;
-  provider: 'gmail' | 'outlook' | 'imap';
-  status: 'connected' | 'disconnected' | 'error';
-  settings: ChannelSettings;
-  createdAt: Date;
-  lastSync?: Date;
+  provider: 'gmail' | 'outlook' | 'custom';
+  status: 'connected' | 'disconnected';
+  imapHost?: string;
+  imapPort?: string;
+  smtpHost?: string;
+  smtpPort?: string;
+  username?: string;
+  oauthToken?: string;
+  createdAt?: string; // Optional timestamp
 }
 
 export interface ChannelSettings {
