@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { AuthContextType, AuthState, LoginCredentials, User, AuthTokens } from './types'
+import { AuthContextType, AuthState, LoginCredentials, User, AuthTokens, Tenant } from './types'
 import { authApi } from './api'
 import toast from 'react-hot-toast'
 
@@ -27,24 +27,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   })
 
   useEffect(() => {
-    // Check for stored auth data on app start
     const storedUser = localStorage.getItem('auth_user')
     const storedTokens = localStorage.getItem('auth_tokens')
+    const storedTenant = localStorage.getItem('auth_tenant')
 
-    if (storedUser && storedTokens) {
+    if (storedUser && storedTokens && storedTenant) {
       try {
         const user: User = JSON.parse(storedUser)
         const tokens: AuthTokens = JSON.parse(storedTokens)
+        const tenant: Tenant = JSON.parse(storedTenant)
 
-        // Check if access token is expired
         if (tokens.access_token) {
           const tokenPayload = JSON.parse(atob(tokens.access_token.split('.')[1]))
           const currentTime = Math.floor(Date.now() / 1000)
 
           if (tokenPayload.exp < currentTime) {
-            // Token is expired, clear storage and don't authenticate
             localStorage.removeItem('auth_user')
             localStorage.removeItem('auth_tokens')
+            localStorage.removeItem('auth_tenant')
+
             setState(prev => ({ ...prev, isLoading: false }))
             return
           }
@@ -52,15 +53,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         setState({
           user,
-          tenant: null,
           tokens,
+          tenant,
           isAuthenticated: true,
           isLoading: false,
         })
-      } catch {
-        // Invalid token format, clear storage
+      } catch (err) {
         localStorage.removeItem('auth_user')
         localStorage.removeItem('auth_tokens')
+        localStorage.removeItem('auth_tenant')
         setState(prev => ({ ...prev, isLoading: false }))
       }
     } else {
@@ -72,16 +73,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setState(prev => ({ ...prev, isLoading: true }))
 
-      const { user, tokens } = await authApi.login(credentials)
+      const { user, tokens, tenant } = await authApi.login(credentials)
 
-      // Store auth data
       localStorage.setItem('auth_user', JSON.stringify(user))
       localStorage.setItem('auth_tokens', JSON.stringify(tokens))
+      localStorage.setItem('auth_tenant', JSON.stringify(tenant))
 
       setState({
         user,
-        tenant: null,
         tokens,
+        tenant,
         isAuthenticated: true,
         isLoading: false,
       })
@@ -99,16 +100,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       await authApi.logout()
     } catch {
-      // Ignore logout errors - always clear local state
+      // ignore
     } finally {
-      // Clear auth data
       localStorage.removeItem('auth_user')
       localStorage.removeItem('auth_tokens')
+      localStorage.removeItem('auth_tenant')
 
       setState({
         user: null,
-        tenant: null,
         tokens: null,
+        tenant: null,
         isAuthenticated: false,
         isLoading: false,
       })
@@ -120,9 +121,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const refreshToken = async () => {
     try {
       const storedTokens = localStorage.getItem('auth_tokens')
-      if (!storedTokens) {
-        throw new Error('No refresh token available')
-      }
+      if (!storedTokens) throw new Error('No tokens found')
 
       const { refresh_token } = JSON.parse(storedTokens)
       const newTokens = await authApi.refreshToken(refresh_token)
@@ -134,8 +133,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         tokens: newTokens,
       }))
     } catch (error) {
-      // Token refresh failed, logout user
-      logout()
+      await logout()
       throw error
     }
   }

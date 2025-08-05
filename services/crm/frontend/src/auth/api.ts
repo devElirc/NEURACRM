@@ -1,11 +1,11 @@
 import axios from 'axios'
-import { AuthTokens, LoginCredentials, User } from './types'
+import { AuthTokens, LoginCredentials, User, Tenant } from './types'
 import { getApiBaseUrl } from '../utils/tenant'
 
 const getApiUrl = () => `${getApiBaseUrl()}/api`
 
 export const authApi = {
-  login: async (credentials: LoginCredentials): Promise<{ user: User; tokens: AuthTokens }> => {
+  login: async (credentials: LoginCredentials): Promise<{ user: User; tokens: AuthTokens; tenant: Tenant }> => {
     const apiUrl = `${getApiUrl()}/auth/login/`
     console.log('🔍 LOGIN DEBUG:', {
       apiUrl,
@@ -15,7 +15,7 @@ export const authApi = {
       port: window.location.port,
       href: window.location.href
     })
-    
+
     try {
       const response = await axios.post(apiUrl, credentials)
       console.log('✅ LOGIN SUCCESS:', response.data)
@@ -80,26 +80,29 @@ axios.interceptors.request.use(
     if (tokens) {
       try {
         const { access_token } = JSON.parse(tokens)
-        
+
         // Check if token is expired before using it
         if (access_token) {
           const tokenPayload = JSON.parse(atob(access_token.split('.')[1]))
           const currentTime = Math.floor(Date.now() / 1000)
-          
+
           if (tokenPayload.exp < currentTime) {
             // Token is expired, don't add it to request
             console.log('🔍 Token expired, not adding to request')
             localStorage.removeItem('auth_tokens')
             localStorage.removeItem('auth_user')
+            localStorage.removeItem('auth_tenant')
             return config
           }
-          
+
           config.headers.Authorization = `Bearer ${access_token}`
         }
       } catch (error) {
         console.error('🔍 Invalid token format:', error)
         localStorage.removeItem('auth_tokens')
         localStorage.removeItem('auth_user')
+        localStorage.removeItem('auth_tenant')
+
       }
     }
     return config
@@ -127,7 +130,7 @@ axios.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config
-    
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
         // If already refreshing, wait for the new token
@@ -138,19 +141,19 @@ axios.interceptors.response.use(
           })
         })
       }
-      
+
       originalRequest._retry = true
       isRefreshing = true
-      
+
       const tokens = localStorage.getItem('auth_tokens')
       if (tokens) {
         const { refresh_token } = JSON.parse(tokens)
-        
+
         try {
           // Check if refresh token is also expired
           const refreshTokenPayload = JSON.parse(atob(refresh_token.split('.')[1]))
           const currentTime = Math.floor(Date.now() / 1000)
-          
+
           if (refreshTokenPayload.exp < currentTime) {
             // Refresh token is also expired, clear storage and redirect
             console.log('🔍 Refresh token expired, redirecting to login')
@@ -158,24 +161,26 @@ axios.interceptors.response.use(
             refreshSubscribers = []
             localStorage.removeItem('auth_tokens')
             localStorage.removeItem('auth_user')
+            localStorage.removeItem('auth_tenant')
+
             window.location.href = '/login'
             return Promise.reject(new Error('Refresh token expired'))
           }
-          
+
           // Use direct axios call to avoid circular dependency
           const response = await axios.post(`${getApiUrl()}/auth/refresh/`, {
             refresh_token: refresh_token,
           })
-          
+
           const newTokens = response.data
           localStorage.setItem('auth_tokens', JSON.stringify(newTokens))
-          
+
           // Update original request with new token
           originalRequest.headers.Authorization = `Bearer ${newTokens.access_token}`
-          
+
           // Notify all waiting requests
           onTokenRefreshed(newTokens.access_token)
-          
+
           isRefreshing = false
           return axios(originalRequest)
         } catch (refreshError) {
@@ -185,6 +190,8 @@ axios.interceptors.response.use(
           refreshSubscribers = []
           localStorage.removeItem('auth_tokens')
           localStorage.removeItem('auth_user')
+          localStorage.removeItem('auth_tenant')
+
           window.location.href = '/login'
           return Promise.reject(refreshError)
         }
@@ -194,7 +201,7 @@ axios.interceptors.response.use(
         window.location.href = '/login'
       }
     }
-    
+
     return Promise.reject(error)
   }
 )

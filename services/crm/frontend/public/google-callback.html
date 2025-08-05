@@ -1,0 +1,66 @@
+<!-- google-callback.html -->
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Google OAuth Callback</title>
+</head>
+
+<body>
+<script>
+  (async function () {
+    console.log("🟡 Callback page loaded");
+
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const rawState = params.get("state");
+
+    if (!code) {
+      window.opener?.postMessage({ status: "google_failed" }, "*");
+      window.close();
+      return;
+    }
+
+    let inboxName = null;
+    let inboxId = null;
+
+    try {
+      const decodedState = decodeURIComponent(rawState);
+      const stateObj = JSON.parse(decodedState);
+      inbox_name = stateObj.inboxName;
+      inboxId = stateObj.inboxId;
+      console.log("✅ Decoded state:", stateObj);
+    } catch (err) {
+      console.error("❌ Failed to parse state:", err);
+    }
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/inbox/auth/google/callback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, inbox_name }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        window.opener?.postMessage({
+          status: "google_connected",
+          email: result.email,
+        }, "*");
+      } else {
+        console.error("Exchange failed:", result);
+        window.opener?.postMessage({ status: "google_failed" }, "*");
+      }
+    } catch (err) {
+      console.error("Network error:", err);
+      window.opener?.postMessage({ status: "google_failed" }, "*");
+    }
+
+    window.close();
+  })();
+</script>
+
+</body>
+
+</html>

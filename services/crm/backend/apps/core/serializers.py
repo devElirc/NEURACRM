@@ -3,8 +3,12 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
 from .authentication import JWTTokenGenerator
-from .models import User
+from .models import User, Client
 
+class TenantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Client
+        fields = ["id", "schema_name", "name", "description", "is_active", "created_on"]
 
 class UserSerializer(serializers.ModelSerializer):
     """

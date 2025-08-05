@@ -8,7 +8,6 @@ from apps.core.super_admin import super_admin_site
 from apps.tenant_core.admin import tenant_admin_site
 from apps.core.views import LoginView
 
-
 def debug_view(request):
     schema = getattr(connection, 'schema_name', 'unknown')
     tenant = getattr(request, 'tenant', None)
@@ -55,6 +54,7 @@ urlpatterns = [
     path("api/campaigns/", include("apps.campaigns.urls")),
     path("api/inbox/", include("apps.team_inbox.urls")),
     path("api/token/", LoginView.as_view(), name="token_obtain_pair"),
+
     # path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),  # JWT token refresh
 ]
 

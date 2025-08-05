@@ -96,7 +96,14 @@ export function SharedInboxManager({ onClose, onCreateInbox }: SharedInboxManage
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {sharedInboxes.map((inbox) => (
-              <InboxCard key={inbox.id} inbox={inbox} onSelect={() => setSelectedInbox(inbox)} />
+              <InboxCard
+                key={inbox.id}
+                inbox={inbox}
+                onSelect={() => {
+                  setSelectedInbox(inbox);
+                }}
+              />
+
             ))}
           </div>
         )}

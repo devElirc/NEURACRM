@@ -52,4 +52,11 @@ class User(AbstractUser):
     def full_name(self):
         return f"{self.first_name} {self.last_name}"
 
+class TenantEmailMapping(models.Model):
+    email = models.EmailField(unique=True, db_index=True)
+    tenant = models.ForeignKey(Client, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
+    def __str__(self):
+        return f"{self.email} → {self.tenant.schema_name}"

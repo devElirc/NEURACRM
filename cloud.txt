@@ -1,0 +1,17 @@
+Project Name: TeamInboxProject
+Project ID: teaminboxproject
+
+Topic name: projects/teaminboxproject/topics/gmail-inbox-events
+Topic Id: gmail-inbox-events
+EndpointURL: https://quick-wasps-grab.loca.lt/api/inbox/gmail/push/
+
+
+lt --port 8000
+
+loca.lt 8000
+authtoken:
+2zHqbKqQ5bEKVteDHfHFwC8ZfO2_3Axpu6n7AavhTtmS683Af
+https://d3401590028a.ngrok-free.app
+https://cb9c505443a1.ngrok-free.app
+
+ngrok http 8000

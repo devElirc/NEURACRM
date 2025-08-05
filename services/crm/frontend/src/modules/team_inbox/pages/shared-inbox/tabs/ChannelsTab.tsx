@@ -13,6 +13,7 @@ interface EmailChannelFormData {
   smtpPort?: string;
   username?: string;
   password?: string;
+  connectionTime?: string;
 }
 
 interface ChannelsTabProps {
@@ -24,23 +25,30 @@ export function ChannelsTab({ inbox }: ChannelsTabProps) {
   const [channels, setChannels] = useState<EmailChannel[]>(inbox.channels);
 
   const handleAddChannel = (channelData: EmailChannelFormData) => {
-    const newChannel: EmailChannel = {
-      id: Date.now().toString(),
-      name: channelData.email,
-      email: channelData.email,
-      provider: channelData.provider,
-      status: 'connected',
-      imapHost: channelData.imapHost,
-      imapPort: channelData.imapPort,
-      smtpHost: channelData.smtpHost,
-      smtpPort: channelData.smtpPort,
-      username: channelData.username,
-      oauthToken: channelData.provider !== 'custom' ? 'mock-oauth-token' : undefined,
-      createdAt: new Date().toISOString() // Added timestamp
-    };
-
-    setChannels(prev => [...prev, newChannel]);
-    setShowAddChannelForm(false);
+    console.log("🔍 Handling channel addition:", channelData);
+    setShowAddChannelForm(false); // Cancel/Close AddChannelForm first
+    setTimeout(() => { // Ensure form is closed before alert
+      alert(`✅ Channel added successfully! Email: ${channelData.email}`); // Show alert next
+      const newChannel: EmailChannel = {
+        id: Date.now().toString(),
+        name: channelData.email,
+        email: channelData.email,
+        provider: channelData.provider,
+        status: 'connected',
+        imapHost: channelData.imapHost,
+        imapPort: channelData.imapPort,
+        smtpHost: channelData.smtpHost,
+        smtpPort: channelData.smtpPort,
+        username: channelData.username,
+        oauthToken: channelData.provider !== 'custom' ? 'mock-oauth-token' : undefined,
+        createdAt: channelData.connectionTime || new Date().toISOString() // e.g., "2025-07-29T14:01:00.000Z"
+      };
+      setChannels(prev => {
+        const updatedChannels = [...prev, newChannel];
+        console.log("🔧 Updated channels:", updatedChannels);
+        return updatedChannels;
+      }); // Add channel last
+    }, 0);
   };
 
   if (showAddChannelForm) {

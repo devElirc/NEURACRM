@@ -13,6 +13,7 @@ from .serializers import (
     LoginSerializer,
     PasswordChangeSerializer,
     TokenRefreshSerializer,
+    TenantSerializer
 )
 from .utils import auth_rate_limit, create_audit_log
 
@@ -98,7 +99,8 @@ class LoginView(APIView):
                 from .serializers import UserSerializer
                 return Response({
                     "user": UserSerializer(user).data,
-                    "tokens": tokens
+                    "tokens": tokens,
+                    "tenant":  TenantSerializer(current_tenant).data if current_tenant else None
                 }, status=status.HTTP_200_OK)
 
             # Debug logging for validation errors

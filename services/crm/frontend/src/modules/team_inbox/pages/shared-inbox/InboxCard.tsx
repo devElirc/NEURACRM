@@ -3,16 +3,21 @@ import { SharedInbox } from '../../types';
 import { Users, Mail, Edit, Trash2, Eye } from 'lucide-react';
 import { Button } from '../../pages/ui/Button';
 
+
 interface InboxCardProps {
   inbox: SharedInbox;
   onSelect: () => void;
 }
 
 export function InboxCard({ inbox, onSelect }: InboxCardProps) {
+
+
   return (
     <div
       className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer"
-      onClick={onSelect}
+      onClick={() => {
+        onSelect();
+      }}
     >
       <div className="flex items-center justify-between mb-4">
         <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
@@ -84,8 +89,8 @@ export function InboxCard({ inbox, onSelect }: InboxCardProps) {
               <span
                 key={channel.id}
                 className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${channel.status === 'connected'
-                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                  : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
                   }`}
               >
                 {channel.provider}

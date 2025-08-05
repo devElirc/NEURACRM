@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Button } from '../../../pages/ui/Button';
-import { Globe } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Button } from "../../../pages/ui/Button";
+import { Globe } from "lucide-react";
 
 interface EmailChannelFormData {
-  provider: 'gmail' | 'outlook' | 'custom';
+  provider: ProviderType;
   email: string;
   imapHost?: string;
   imapPort?: string;
@@ -13,223 +13,258 @@ interface EmailChannelFormData {
   password?: string;
 }
 
+type ProviderType = "gmail" | "outlook" | "custom";
+
 interface AddChannelFormProps {
-  onSubmit: (data: EmailChannelFormData) => void;
+  onSubmit: (data: { provider: string; email: string }) => void;
   onCancel: () => void;
 }
 
-export default function AddChannelForm({ onSubmit, onCancel }: AddChannelFormProps) {
+const OAUTH_CONFIG: Record<Exclude<ProviderType, "custom">, any> = {
+  gmail: {
+    clientId:
+      "757122969965-h4i287jiv8n5d6jbaergafq3ddki132e.apps.googleusercontent.com",
+    scope:
+      "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email",
+    authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+    callbackPath: "/google-callback.html",
+  },
+  outlook: {
+    clientId: "YOUR_OUTLOOK_CLIENT_ID",
+    scope: "https://graph.microsoft.com/Mail.Read User.Read",
+    authUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+    callbackPath: "/outlook-callback.html",
+  },
+};
+
+/** Provider selector buttons */
+const ProviderSelector: React.FC<{
+  selected: ProviderType;
+  onSelect: (provider: ProviderType) => void;
+}> = ({ selected, onSelect }) => (
+  <div className="flex space-x-4">
+    {(["gmail", "outlook", "custom"] as const).map((id) => (
+      <button
+        key={id}
+        type="button"
+        onClick={() => onSelect(id)}
+        className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${selected === id
+          ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+          : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+          }`}
+      >
+        <Globe className="w-4 h-4 inline-block mr-2" />
+        {id === "custom" ? "Custom (IMAP/SMTP)" : id[0].toUpperCase() + id.slice(1)}
+      </button>
+    ))}
+  </div>
+);
+
+/** Fields for custom IMAP/SMTP provider */
+const CustomProviderFields: React.FC<{
+  formData: EmailChannelFormData;
+  setFormData: React.Dispatch<React.SetStateAction<EmailChannelFormData>>;
+}> = ({ formData, setFormData }) => (
+  <div className="space-y-4">
+    <input
+      type="email"
+      placeholder="Email"
+      value={formData.email}
+      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+      className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600"
+    />
+    {(
+      ["imapHost", "imapPort", "smtpHost", "smtpPort", "username", "password"] as const
+    ).map((field) => (
+      <input
+        key={field}
+        type={field === "password" ? "password" : "text"}
+        placeholder={field
+          .charAt(0)
+          .toUpperCase()
+          .concat(field.slice(1).replace(/([A-Z])/g, " $1"))}
+        value={formData[field] || ""}
+        onChange={(e) => setFormData({ ...formData, [field]: e.target.value })}
+        className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600"
+      />
+    ))}
+  </div>
+);
+
+export default function AddChannelForm({
+  onSubmit,
+  onCancel,
+}: AddChannelFormProps) {
   const [formData, setFormData] = useState<EmailChannelFormData>({
-    provider: 'gmail',
-    email: '',
-    imapHost: '',
-    imapPort: '',
-    smtpHost: '',
-    smtpPort: '',
-    username: '',
-    password: ''
+    provider: "gmail",
+    email: "",
   });
 
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
-
-  const providerRef = useRef(formData.provider);
-  useEffect(() => {
-    providerRef.current = formData.provider;
-  }, [formData.provider]);
-
-  // Popup reference
   const popupRef = useRef<Window | null>(null);
 
-  const OAUTH_CONFIG = {
-    gmail: {
-      clientId: '757122969965-h4i287jiv8n5d6jbaergafq3ddki132e.apps.googleusercontent.com',
-      scope: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email',
-      authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
-      callbackPath: '/api/inbox/auth/google/callback'
-    },
-    outlook: {
-      clientId: 'YOUR_OUTLOOK_CLIENT_ID',
-      scope: 'https://graph.microsoft.com/Mail.Read',
-      authUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
-      callbackPath: '/api/inbox/auth/outlook/callback'
-    }
-  };
-
-  // Message listener
+  /** OAuth postMessage listener */
   useEffect(() => {
-    const listener = (event: MessageEvent) => {
-      console.log("📥 Raw message from popup:", event.data);
+    
+    const handleMessage = async (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
 
-      let data = event.data;
-      if (typeof data === 'string') {
+      const { status, email } = event.data || {};
+      if (!status) return;
+
+      if (status === "google_connected") {
+        setConnectionStatus("Connected successfully!");
+        setFormData((prev) => ({ ...prev, email }));
+
+        // ✅ Now we can use await
         try {
-          data = JSON.parse(data);
-        } catch {
-          console.warn("⚠️ Could not parse message:", data);
+          onSubmit({ provider: formData.provider, email });
+        } catch (err) {
+          setConnectionStatus("Team Inbox creation failed.");
         }
+      } else if (status === "google_failed") {
+        setConnectionStatus("Connection failed.");
       }
 
-      console.log("📥 Parsed data:", data);
-      if (!data || !data.status) return;
-
-      const provider = providerRef.current;
-
-      if (data.status === `${provider}_connected`) {
-        alert(`✅ ${provider.toUpperCase()} connected! Email: ${data.email}`);
-        setConnectionStatus('Connected successfully!');
-        onSubmit({ provider, email: data.email });
-      } else if (data.status === `${provider}_failed`) {
-        alert(`❌ ${provider.toUpperCase()} connection failed!`);
-        setConnectionStatus('Connection failed');
-      }
-
-
-      // Close popup if open
-      if (popupRef.current && !popupRef.current.closed) {
-        popupRef.current.close();
-      }
+      if (popupRef.current && !popupRef.current.closed) popupRef.current.close();
     };
 
-    console.log("👂 Attaching message listener (stable)");
-    window.addEventListener('message', listener);
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [formData.provider, onSubmit]);
 
-    return () => {
-      console.log("❌ Removing message listener");
-      window.removeEventListener('message', listener);
-    };
-  }, [onSubmit]);
 
-  // Detect popup close using window focus event (no .closed polling)
-  useEffect(() => {
-    function onFocus() {
-      if (popupRef.current && popupRef.current.closed) {
-        console.log("❌ Popup closed detected by window focus");
-        setConnectionStatus('Popup closed before connecting');
+  /** Handle OAuth flow */
+  // const handleOAuthConnect = useCallback(() => {
+
+    
+  //   const inboxName = JSON.parse(localStorage.getItem("selected_inbox_name") || '""');
+  // const inboxId = JSON.parse(localStorage.getItem("selected_inbox_id") || '""');
+  //   const config = OAUTH_CONFIG[formData.provider as Exclude<ProviderType, "custom">];
+  //   if (!config) return;
+
+
+
+  //   setConnectionStatus("Connecting...");
+  //   setFormData((prev) => ({ ...prev, email: "" }));
+
+  //   const redirectUri = `${window.location.origin}${config.callbackPath}`;
+  //   const url =
+  //     `${config.authUrl}?` +
+  //     new URLSearchParams({
+  //       client_id: config.clientId,
+  //       redirect_uri: redirectUri,
+  //       response_type: "code",
+  //       scope: config.scope,
+  //       access_type: "offline",
+  //       prompt: "consent",
+  //       state: formData.provider,
+  //     }).toString();
+
+  //   popupRef.current = window.open(url, "oauthPopup", "width=600,height=700");
+  //   if (!popupRef.current) setConnectionStatus("Popup blocked. Please allow popups.");
+  // }, [formData.provider]);
+
+const handleOAuthConnect = useCallback(() => {
+  const inboxName = JSON.parse(localStorage.getItem("selected_inbox_name") || '""');
+  const inboxId = JSON.parse(localStorage.getItem("selected_inbox_id") || '""');
+
+  const config = OAUTH_CONFIG[formData.provider as Exclude<ProviderType, "custom">];
+  if (!config) return;
+
+  setConnectionStatus("Connecting...");
+  setFormData((prev) => ({ ...prev, email: "" }));
+
+  const redirectUri = `${window.location.origin}${config.callbackPath}`;
+
+  // Create a JSON string containing provider + inbox info
+  const stateObj = {
+    provider: formData.provider,
+    inboxName,
+    inboxId,
+  };
+
+  const url =
+    `${config.authUrl}?` +
+    new URLSearchParams({
+      client_id: config.clientId,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: config.scope,
+      access_type: "offline",
+      prompt: "consent",
+      state: encodeURIComponent(JSON.stringify(stateObj)),  // encode JSON string as URI component
+    }).toString();
+
+  popupRef.current = window.open(url, "oauthPopup", "width=600,height=700");
+  if (!popupRef.current) setConnectionStatus("Popup blocked. Please allow popups.");
+}, [formData.provider]);
+
+
+
+  /** Handle Custom (IMAP/SMTP) submission */
+  const handleCustomSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setConnectionStatus("Testing connection...");
+      try {
+        if (!formData.email)
+          throw new Error("Email is required for custom provider");
+
+        for (const field of [
+          "imapHost",
+          "imapPort",
+          "smtpHost",
+          "smtpPort",
+          "username",
+          "password",
+        ]) {
+          if (!formData[field as keyof EmailChannelFormData]) {
+            throw new Error("All fields are required for custom provider");
+          }
+        }
+
+        // Simulated connection
+        await new Promise((res) => setTimeout(res, 800));
+        setConnectionStatus("Connected successfully!");
+        onSubmit({ provider: formData.provider, email: formData.email });
+        onCancel();
+      } catch (err) {
+        setConnectionStatus((err as Error).message);
       }
-    }
-    window.addEventListener('focus', onFocus);
-
-    return () => {
-      window.removeEventListener('focus', onFocus);
-    };
-  }, []);
-
-  const handleProviderChange = (provider: 'gmail' | 'outlook' | 'custom') => {
-    setFormData(prev => ({
-      provider,
-      email: provider === 'custom' ? prev.email : '',
-      imapHost: provider === 'custom' ? prev.imapHost : '',
-      imapPort: provider === 'custom' ? prev.imapPort : '',
-      smtpHost: provider === 'custom' ? prev.smtpHost : '',
-      smtpPort: provider === 'custom' ? prev.smtpPort : '',
-      username: provider === 'custom' ? prev.username : '',
-      password: provider === 'custom' ? prev.password : ''
-    }));
-  };
-
-  const handleOAuthConnect = (provider: 'gmail' | 'outlook') => {
-    const config = OAUTH_CONFIG[provider];
-    if (!config) return;
-
-    setConnectionStatus('Connecting...');
-    const redirectUri = `http://127.0.0.1:8000${config.callbackPath}`;
-
-    const authUrl =
-      `${config.authUrl}?` +
-      new URLSearchParams({
-        client_id: config.clientId,
-        redirect_uri: redirectUri,
-        response_type: 'code',
-        scope: config.scope,
-        access_type: 'offline',
-        prompt: 'consent',
-        state: provider
-      }).toString();
-
-    console.log('🌐 Opening OAuth popup:', authUrl);
-
-    popupRef.current = window.open(authUrl, 'oauthPopup', 'width=600,height=700');
-
-    if (!popupRef.current) {
-      alert('Popup blocked! Please allow popups and try again.');
-    }
-  };
-
-  const handleCustomSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setConnectionStatus('Testing connection...');
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      if (!formData.email) throw new Error('Email is required');
-      setConnectionStatus('Connected successfully');
-      onSubmit(formData);
-    } catch {
-      setConnectionStatus('Connection failed');
-    }
-  };
+    },
+    [formData, onSubmit, onCancel]
+  );
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg w-full">
       <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Add Email Channel</h2>
-        <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+          Add Email Channel
+        </h2>
+        <Button variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
       </div>
 
       <div className="p-6 space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Provider</label>
-          <div className="flex space-x-4">
-            {['gmail', 'outlook', 'custom'].map((id) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => handleProviderChange(id as any)}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${formData.provider === id
-                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
-                    : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`}
-              >
-                <Globe className="w-4 h-4 inline-block mr-2" />
-                {id === 'custom' ? 'Custom (IMAP/SMTP)' : id.charAt(0).toUpperCase() + id.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Provider
+        </label>
+        <ProviderSelector
+          selected={formData.provider}
+          onSelect={(provider) =>
+            setFormData({ provider, email: "" })
+          }
+        />
 
-        {formData.provider === 'custom' && (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={e => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm"
-                placeholder="Enter email address"
-              />
-            </div>
-            {['imapHost', 'imapPort', 'smtpHost', 'smtpPort', 'username', 'password'].map(field => (
-              <div key={field}>
-                <input
-                  type={field === 'password' ? 'password' : 'text'}
-                  value={(formData as any)[field] || ''}
-                  onChange={e => setFormData({ ...formData, [field]: e.target.value })}
-                  placeholder={field}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm"
-                />
-              </div>
-            ))}
-          </>
+        {formData.provider === "custom" && (
+          <CustomProviderFields formData={formData} setFormData={setFormData} />
         )}
 
         {connectionStatus && (
           <div
-            className={`text-sm ${connectionStatus.toLowerCase().includes('success')
-                ? 'text-green-600'
-                : connectionStatus.toLowerCase().includes('fail') ||
-                  connectionStatus.toLowerCase().includes('closed')
-                  ? 'text-red-600'
-                  : 'text-gray-600'
+            className={`text-sm ${connectionStatus.includes("success") ? "text-green-600" : "text-red-600"
               }`}
           >
             {connectionStatus}
@@ -237,33 +272,17 @@ export default function AddChannelForm({ onSubmit, onCancel }: AddChannelFormPro
         )}
 
         <div className="flex items-center justify-end space-x-3">
-          <Button variant="outline" type="button" onClick={onCancel}>Cancel</Button>
-          {formData.provider === 'custom' ? (
-            <Button
-              type="button"
-              onClick={handleCustomSubmit}
-              disabled={
-                !formData.email ||
-                !formData.imapHost ||
-                !formData.imapPort ||
-                !formData.smtpHost ||
-                !formData.smtpPort ||
-                !formData.username ||
-                !formData.password
-              }
-            >
+          <Button variant="outline" type="button" onClick={onCancel}>
+            Cancel
+          </Button>
+          {formData.provider === "custom" ? (
+            <Button type="button" onClick={handleCustomSubmit}>
               Connect
             </Button>
           ) : (
-            <Button
-              type="button"
-              onClick={() => {
-                if (formData.provider !== 'custom') {
-                  handleOAuthConnect(formData.provider);
-                }
-              }}
-            >
-              Connect with {formData.provider === 'gmail' ? 'Google' : 'Microsoft'}
+            <Button type="button" onClick={handleOAuthConnect}>
+              Connect with{" "}
+              {formData.provider === "gmail" ? "Google" : "Microsoft"}
             </Button>
           )}
         </div>

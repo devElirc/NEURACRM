@@ -1,0 +1,8 @@
+django 
+requests 
+google-auth
+google-api-python-client google-auth google-auth-oauthlib
+channels_redis
+channels
+
+daphne

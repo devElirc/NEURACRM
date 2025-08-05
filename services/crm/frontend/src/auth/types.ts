@@ -1,3 +1,13 @@
+export interface Tenant {
+  id: string
+  name: string
+  schema_name: string
+  description?: string
+  created_on: string
+  is_active: boolean
+}
+
+
 export interface User {
   id: string
   email: string
@@ -34,11 +44,12 @@ export interface LoginCredentials {
 
 export interface AuthState {
   user: User | null
-  tenant: null,
+  tenant: Tenant | null 
   tokens: AuthTokens | null
   isAuthenticated: boolean
   isLoading: boolean
 }
+
 
 export interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>

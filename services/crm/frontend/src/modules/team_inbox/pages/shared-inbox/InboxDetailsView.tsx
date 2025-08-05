@@ -6,7 +6,7 @@ import OverviewTab from './tabs/OverviewTab';
 import MembersTab from './tabs/MembersTab';
 import { ChannelsTab } from './tabs/ChannelsTab'; // Changed to named import
 import SettingsTab from './tabs/SettingsTab';
-
+import { useEffect } from 'react';
 interface InboxDetailsViewProps {
   inbox: SharedInbox;
   onBack: () => void;
@@ -22,6 +22,11 @@ export function InboxDetailsView({ inbox, onBack, onClose }: InboxDetailsViewPro
     { id: 'channels', label: 'Channels', icon: Mail },
     { id: 'settings', label: 'Settings', icon: Settings }
   ];
+
+  localStorage.setItem("selected_inbox_name", JSON.stringify(inbox.name));
+  localStorage.setItem("selected_inbox_id", JSON.stringify(inbox.id));
+
+
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-w-6xl w-full max-h-[90vh] overflow-hidden">
@@ -51,8 +56,8 @@ export function InboxDetailsView({ inbox, onBack, onClose }: InboxDetailsViewPro
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`flex items-center space-x-2 py-4 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                   }`}
               >
                 <Icon className="w-4 h-4" />

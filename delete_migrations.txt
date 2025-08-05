@@ -1,0 +1,249 @@
+delete :
+del /s /q __pycache__\*
+for /d /r . %d in (__pycache__) do @if exist "%d" rd /s /q "%d"
+
+
+for /r %d in (migrations) do del "%d\*.py" /q & del "%d\*.pyc" /q & echo y|del "%d\__init__.py" >nul 2>&1 & copy nul "%d\__init__.py" >nul
+
+
+That deletes all .py and .pyc files in each migrations/ folder, then re-creates an empty __init__.py file (which Django requires).
+
+
+
+python manage.py shell
+
+
+from apps.core.models import Client, Domain
+
+# Inspect Client fields to know what to pass
+print([f.name for f in Client._meta.get_fields()])
+
+# Create public tenant (adjust fields accordingly)
+public_tenant = Client(schema_name='public', name='Public Tenant')
+public_tenant.save()
+
+# Create domain pointing to public tenant
+domain = Domain(domain='127.0.0.1', tenant=public_tenant, is_primary=True)
+domain.save()
+
+
+
+python manage.py createsuperuser
+
+
+Step 1: Backup (optional but recommended)
+If you have any data you want to keep, back it up now.
+
+Step 2: Drop the existing database
+Use your DB client or psql CLI to drop the old DB, then create a fresh empty DB.
+
+Example with PostgreSQL CLI:
+
+bash
+Copy
+Edit
+psql -U your_db_user
+DROP DATABASE your_db_name;
+CREATE DATABASE your_db_name;
+\q
+Step 3: Apply migrations
+Run all migrations to create tables for public + tenant schemas:
+
+bash
+Copy
+Edit
+python manage.py migrate_schemas --shared
+or if you don’t use migrate_schemas, then:
+
+bash
+Copy
+Edit
+python manage.py migrate
+This creates all tables in the public schema.
+
+Step 4: Create the public tenant
+In your django-tenants setup, the public tenant should already exist after migrations. If not, create it:
+
+bash
+Copy
+Edit
+python manage.py shell
+python
+Copy
+Edit
+from django_tenants.utils import get_tenant_model
+
+TenantModel = get_tenant_model()
+
+if not TenantModel.objects.filter(schema_name='public').exists():
+    public_tenant = TenantModel(schema_name='public', name='Public Tenant')
+    public_tenant.save()
+else:
+    public_tenant = TenantModel.objects.get(schema_name='public')
+
+print(public_tenant)
+exit()
+Step 5: Create the main tenant
+You need to create your main tenant (e.g., schema name main):
+
+bash
+Copy
+Edit
+python manage.py shell
+python
+Copy
+Edit
+from django_tenants.utils import get_tenant_model
+TenantModel = get_tenant_model()
+
+if not TenantModel.objects.filter(schema_name='main').exists():
+    main_tenant = TenantModel(schema_name='main', name='Main Tenant')
+    main_tenant.save()
+else:
+    main_tenant = TenantModel.objects.get(schema_name='main')
+
+print(main_tenant)
+exit()
+Step 6: Create Domains for tenants
+Assign domains (localhost, 127.0.0.1, public.localhost) to tenants:
+
+bash
+Copy
+Edit
+python manage.py shell
+python
+Copy
+Edit
+from apps.core.models import Domain
+from django_tenants.utils import get_tenant_model
+
+TenantModel = get_tenant_model()
+public_tenant = TenantModel.objects.get(schema_name='public')
+main_tenant = TenantModel.objects.get(schema_name='main')
+
+Domain.objects.update_or_create(domain='public.localhost', defaults={'tenant': public_tenant})
+Domain.objects.update_or_create(domain='localhost', defaults={'tenant': main_tenant})
+Domain.objects.update_or_create(domain='127.0.0.1', defaults={'tenant': main_tenant})
+
+exit()
+Step 7: Run migrations on tenant schema
+You must migrate the tenant schema tables:
+
+bash
+Copy
+Edit
+python manage.py migrate_schemas --tenant=main
+Step 8: Create superuser in the public schema
+Run:
+
+bash
+Copy
+Edit
+python manage.py createsuperuser
+This user can log in to:
+
+bash
+Copy
+Edit
+http://public.localhost:8000/superadmin/
+Step 9: Create tenant users
+To create users inside tenant schema (main):
+
+bash
+Copy
+Edit
+python manage.py shell
+python
+Copy
+Edit
+from django_tenants.utils import schema_context
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+with schema_context('main'):
+    User.objects.create_superuser(username='tenantadmin', email='tenantadmin@example.com', password='yourpassword')
+    # Or create normal users:
+    User.objects.create_user(username='tenantuser', email='user@example.com', password='yourpassword')
+exit()
+Step 10: Configure your frontend/backend
+Your frontend (e.g., at localhost:3000) should call backend APIs at localhost:8000.
+
+Make sure CORS allows http://localhost:3000.
+
+Use middleware or domains so /superadmin is served only on public.localhost.
+
+Step 11: Test everything
+Open http://public.localhost:8000/superadmin/ → login with superuser.
+
+Open http://localhost:8000/ → tenant main site.
+
+Check tenant admin login if needed.
+
+Test your frontend login at http://localhost:3000/login.
+
+Extra tips:
+Update your OS hosts file to map public.localhost → 127.0.0.1:
+
+cpp
+Copy
+Edit
+127.0.0.1 public.localhost
+127.0.0.1 localhost
+
+
+
+
+
+Fix it by linking that user to the main tenant:
+Run this in Django shell:
+
+python
+Copy
+Edit
+from django_tenants.utils import get_tenant_model, schema_context
+from django.contrib.auth import get_user_model
+
+Tenant = get_tenant_model()
+User = get_user_model()
+
+tenant = Tenant.objects.get(schema_name="main")
+
+with schema_context('main'):
+    user = User.objects.get(email="joshua.andrews.ckr@gmail.com")
+    user.tenants.add(tenant)
+    user.save()
+    print(f"✅ Linked {user.email} to tenant {tenant.schema_name}")
+
+
+
+
+
+
+Step 2: Run the following commands (replace email/password as needed)
+python
+Copy
+Edit
+from apps.core.models import User  # or wherever your User model is
+
+# Try to get existing user by email
+email = "develirc@gmail.com"
+password = "Passrd123!@#"
+
+try:
+    user = User.objects.get(email=email)
+    print(f"User found: {user.email}")
+except User.DoesNotExist:
+    user = User.objects.create_user(email=email, password=password, username="develirc")
+    print("Created new user:", user.email)
+
+# Set required superadmin flags
+user.is_superadmin = True
+user.is_staff = True
+user.is_active = True
+
+# Set password (in case you want to reset it)
+user.set_password(password)
+
+user.save()
+print(f"Superadmin user ready: {user.email}")
