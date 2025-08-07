@@ -33,6 +33,7 @@ SHARED_APPS = [
     "unfold",  # Django Unfold admin theme
     "django_tenants",
     "apps.core",
+    'django_filters',
     "django_extensions",
     "django.contrib.admin",
     "django.contrib.auth",

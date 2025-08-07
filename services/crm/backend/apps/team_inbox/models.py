@@ -41,6 +41,7 @@ class ChannelAccount(models.Model):
     expires_in = models.IntegerField()  # seconds until token expires
     token_acquired_at = models.DateTimeField(default=timezone.now)
     inbox = models.ForeignKey(Inbox, on_delete=models.CASCADE, related_name='channels')
+    last_history_id = models.CharField(max_length=255, null=True, blank=True)
 
     def __str__(self):
         return f"{self.email} ({self.provider})"
@@ -51,30 +52,200 @@ class ChannelAccount(models.Model):
 
 
 class Tag(models.Model):
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=50)
-    is_shared = models.BooleanField(default=False)
+
+    name = models.CharField(max_length=50, unique=True)
+    color = models.CharField(max_length=7, default="#cccccc")
 
     def __str__(self):
         return self.name
 
 
-class Message(models.Model):
+class Label(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    color = models.CharField(max_length=7, default="#cccccc")  # Hex color
+
+    def __str__(self):
+        return self.name
+
+class Conversation(models.Model):
+    STATUS_CHOICES = [
+        ('open', 'Open'),
+        ('closed', 'Closed'),
+        ('pending', 'Pending'),
+        ('spam', 'Spam'),
+    ]
+
+    PRIORITY_CHOICES = [
+        ('low', 'Low'),
+        ('normal', 'Normal'),
+        ('high', 'High'),
+        ('urgent', 'Urgent'),
+    ]
+
+    CHANNEL_CHOICES = [
+        ('email', 'Email'),
+        ('chat', 'Chat'),
+        ('social', 'Social'),
+        ('phone', 'Phone'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    message_id = models.CharField(max_length=255, unique=True)  # e.g. Gmail message ID
+    thread_id = models.CharField(max_length=255, db_index=True)
     subject = models.CharField(max_length=255)
-    sender = models.CharField(max_length=255)
-    recipient = models.CharField(max_length=255)
-    body = models.TextField()
-    received_at = models.DateTimeField()
-    inbox = models.ForeignKey(Inbox, on_delete=models.CASCADE, related_name='messages')
-    assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_messages')
-    is_read = models.BooleanField(default=False)
-    tags = models.ManyToManyField(Tag, blank=True, related_name='messages')
+    participants = models.JSONField(default=list)  # List of { name, email }
+    tags = models.ManyToManyField('Tag', blank=True, related_name='conversations')
+
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='assigned_conversations'
+    )
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='assigned_by_conversations'
+    )
+    assigned_at = models.DateTimeField(null=True, blank=True)
+
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='open')
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='normal')
+    last_activity = models.DateTimeField()
+    last_message = models.ForeignKey(
+        'Message',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='conversation_last_used_in'
+    )
+
+    snoozed = models.BooleanField(default=False)
     snooze_until = models.DateTimeField(null=True, blank=True)
+
+    channel = models.CharField(max_length=10, choices=CHANNEL_CHOICES, default='email')
+    contact_id = models.UUIDField(null=True, blank=True)
+    company_id = models.UUIDField(null=True, blank=True)
+    shared_inbox_id = models.UUIDField(null=True, blank=True)
+
+    is_archived = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.subject
+
+
+class Message(models.Model):
+    PRIORITY_CHOICES = [
+        ('low', 'Low'),
+        ('normal', 'Normal'),
+        ('high', 'High'),
+        ('urgent', 'Urgent'),
+    ]
+
+    SOURCE_CHOICES = [
+        ('incoming', 'Incoming'),
+        ('outgoing', 'Outgoing'),
+        ('internal', 'Internal'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    conversation = models.ForeignKey(
+        Conversation,
+        on_delete=models.CASCADE,
+        related_name='messages',  # MUST be 'messages' for serializer & queryset
+        null=True,
+        blank=True,
+    )
+    thread_id = models.CharField(max_length=255, blank=True, null=True)
+    message_id = models.CharField(max_length=255, unique=True)
+    in_reply_to = models.CharField(max_length=255, blank=True, null=True)
+    references = models.JSONField(blank=True, null=True)  # List of strings
+
+    subject = models.CharField(max_length=255)
+    from_email = models.JSONField()  # { name: str, email: str }
+    to = models.JSONField()          # List of { name: str, email: str }
+    cc = models.JSONField(blank=True, null=True)
+    bcc = models.JSONField(blank=True, null=True)
+    reply_to = models.JSONField(blank=True, null=True)
+
+    content = models.TextField()
+    html_content = models.TextField(blank=True, null=True)
+
+    timestamp = models.DateTimeField()
+    is_read = models.BooleanField(default=False)
+    is_starred = models.BooleanField(default=False)
+    is_draft = models.BooleanField(default=False)
+
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default='incoming')
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='normal')
+
+    inbox = models.ForeignKey(
+        'Inbox',
+        on_delete=models.CASCADE,
+        related_name='messages'
+    )
+
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='assigned_messages'
+    )
+
+    labels = models.ManyToManyField('Label', blank=True, related_name='messages')
+    attachments = models.ManyToManyField('Attachment', blank=True, related_name='messages')
+    internal_notes = models.ManyToManyField('InternalNote', blank=True, related_name='messages')
+
+    snooze_until = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.subject
+
+
+# class Attachment(models.Model):
+#     message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name='attachments')
+#     filename = models.CharField(max_length=255)
+#     file_url = models.URLField()
+#     mime_type = models.CharField(max_length=100)
+#     size = models.IntegerField()  # in bytes
+
+#     def __str__(self):
+#         return self.filename
+
+class Attachment(models.Model):
+    message = models.ForeignKey(
+        Message,
+        on_delete=models.CASCADE,
+        related_name='attachment_set'  
+    )
+    filename = models.CharField(max_length=255)
+    file_url = models.URLField()
+    mime_type = models.CharField(max_length=100)
+    size = models.IntegerField()  # in bytes
+
+    def __str__(self):
+        return self.filename
+
+
+
+class InternalNote(models.Model):
+    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name='note_set')
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'Note by {self.author} on {self.created_at}'
 
 
 class Comment(models.Model):

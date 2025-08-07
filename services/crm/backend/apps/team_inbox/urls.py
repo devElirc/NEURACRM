@@ -1,6 +1,8 @@
 from django.urls import path, include
 from rest_framework import routers
-from .views.views import  gmail_notify, TeamMemberViewSet, InboxViewSet, ChannelAccountViewSet, TagViewSet, MessageViewSet, CommentViewSet, TaskViewSet, CalendarEventViewSet
+from .views.views import  gmail_notify, TeamMemberViewSet, InboxViewSet, ChannelAccountViewSet, TagViewSet, CommentViewSet, TaskViewSet, CalendarEventViewSet
+from .views.message_view import  MessageViewSet
+from .views.conversations import  ConversationListView
 from .views.google_integration import google_callback
 
 
@@ -20,4 +22,7 @@ urlpatterns = [
     path('auth/google/callback', google_callback, name='google_callback'),
         # Gmail Pub/Sub push notification webhook
     path('gmail/push/', gmail_notify, name='gmail_notify'),
+
+    path("conversations/", ConversationListView.as_view(), name="conversation-list"),
+
 ]

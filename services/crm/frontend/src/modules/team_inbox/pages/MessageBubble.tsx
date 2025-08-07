@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Message } from '../types';
 import { formatDateTime } from '../utils/dateUtils';
-import { 
-  Paperclip, 
-  Download, 
-  Reply, 
-  Forward, 
+import {
+  Paperclip,
+  Download,
+  Reply,
+  Forward,
   MoreVertical,
   MessageSquare,
   ExternalLink
@@ -19,31 +19,35 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const [showActions, setShowActions] = useState(false);
   const [showInternalNotes, setShowInternalNotes] = useState(false);
 
-  const isIncoming = !message.from.includes('@yourcompany.com');
+  console.log("message", message);
+
+  // const isIncoming = !message.from.includes('@yourcompany.com');
+  const isIncoming = !message.from.email.includes('devhirohi@gmail.com');
+
 
   return (
-    <div 
+    <div
       className={`group relative ${isIncoming ? 'ml-0 mr-12' : 'ml-12 mr-0'}`}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
       <div className={`flex ${isIncoming ? 'flex-row' : 'flex-row-reverse'} items-start space-x-3`}>
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${
-          isIncoming ? 'bg-gray-500' : 'bg-blue-500'
-        }`}>
-          {message.from.charAt(0).toUpperCase()}
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${isIncoming ? 'bg-gray-500' : 'bg-blue-500'
+          }`}>
+          {message.from.email.charAt(0).toUpperCase()}
+
         </div>
 
         <div className={`flex-1 min-w-0 ${isIncoming ? 'ml-3' : 'mr-3'}`}>
-          <div className={`bg-white border rounded-lg shadow-sm p-4 ${
-            isIncoming ? 'border-gray-200' : 'border-blue-200 bg-blue-50'
-          }`}>
+          <div className={`bg-white border rounded-lg shadow-sm p-4 ${isIncoming ? 'border-gray-200' : 'border-blue-200 bg-blue-50'
+            }`}>
             <div className="flex items-center justify-between mb-2">
               <div>
-                <span className="font-medium text-gray-900">{message.from}</span>
+                <span className="font-medium text-gray-900">{message.from.email}</span>
                 <span className="text-sm text-gray-500 ml-2">
-                  to {message.to.join(', ')}
+                  to {message.to.map(person => `${person.name} <${person.email}>`).join(', ')}
                 </span>
+
               </div>
               <span className="text-xs text-gray-500">
                 {formatDateTime(message.timestamp)}
@@ -83,7 +87,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 <MessageSquare className="h-3 w-3" />
                 <span>{message.internalNotes.length} internal note{message.internalNotes.length !== 1 ? 's' : ''}</span>
               </button>
-              
+
               {showInternalNotes && (
                 <div className="mt-2 space-y-2">
                   {message.internalNotes.map((note) => (

@@ -29,7 +29,23 @@ export function formatDistanceToNow(date: Date): string {
   return date.toLocaleDateString();
 }
 
-export function formatDateTime(date: Date): string {
+// export function formatDateTime(date: Date): string {
+//   return new Intl.DateTimeFormat('en-US', {
+//     year: 'numeric',
+//     month: 'short',
+//     day: 'numeric',
+//     hour: 'numeric',
+//     minute: '2-digit',
+//     hour12: true,
+//   }).format(date);
+// }
+
+export function formatDateTime(date: Date | string | number | null | undefined): string {
+  if (!date) return "—"; // Show placeholder if missing
+
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "Invalid Date";
+
   return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'short',
@@ -37,8 +53,10 @@ export function formatDateTime(date: Date): string {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
-  }).format(date);
+  }).format(d);
 }
+
+
 
 export function formatTime(date: Date): string {
   return new Intl.DateTimeFormat('en-US', {

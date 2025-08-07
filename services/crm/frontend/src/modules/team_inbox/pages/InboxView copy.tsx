@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../../auth/AuthProvider';
 import { ConversationList } from './ConversationList';
 import { ConversationView } from './ConversationView';
@@ -7,13 +7,9 @@ import { EmailComposer } from './EmailComposer';
 import { Sidebar } from './Sidebar';
 import { SharedInboxManager } from './shared-inbox/SharedInboxManager';
 import { Conversation, Contact, Message, SharedInbox } from '../types';
-import { mockSharedInboxes } from '../data/mockData';
-import toast, { Toaster } from 'react-hot-toast';
-
+import { mockConversations, mockContacts, mockSharedInboxes } from '../data/mockData';
 import { Plus, RefreshCw, Settings, Filter } from 'lucide-react';
-
-
-
+import toast, { Toaster } from 'react-hot-toast';
 interface EmailData {
   to: string[];
   cc: string[];
@@ -32,30 +28,32 @@ export function InboxView() {
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [showComposer, setShowComposer] = useState(false);
   const [showSharedInboxManager, setShowSharedInboxManager] = useState(false);
+
   const [sidebarFilter, setSidebarFilter] = useState('inbox');
+  // const [conversations, setConversations] = useState<Conversation[]>(mockConversations);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+
+
   const [sharedInboxes, setSharedInboxes] = useState<SharedInbox[]>(mockSharedInboxes);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // WebSocket reference
   const ws = useRef<WebSocket | null>(null);
-  const hasConnected = useRef(false);
 
   useEffect(() => {
     if (!tenant?.id) return;
-    if (hasConnected.current) return;
 
-    hasConnected.current = true;
-
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const backendHost = 'localhost:8000';
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const backendHost = "localhost:8000"; // ⚠️ Replace with env var or deployment URL in production
     const wsUrl = `${protocol}://${backendHost}/ws/inbox/?tenant=${tenant.id}`;
 
     ws.current = new WebSocket(wsUrl);
 
     ws.current.onopen = () => {
-      console.log('✅ WebSocket connected:', wsUrl);
+      console.log("✅ WebSocket connected:", wsUrl);
+      // Delay sending first message slightly to avoid race condition disconnects
       setTimeout(() => {
-        ws.current?.send(JSON.stringify({ message: 'Hello from frontend!' }));
+        ws.current?.send(JSON.stringify({ message: "Hello from frontend!" }));
       }, 100);
     };
 
@@ -64,30 +62,34 @@ export function InboxView() {
     };
 
     ws.current.onerror = (error) => {
-      console.error('⚠️ WebSocket error:', error);
+      console.error("⚠️ WebSocket error:", error);
     };
 
     ws.current.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log('📩 New WebSocket message:', data);
+        console.log("📩 New WebSocket message:", data);
 
-        if (data.type === 'new_conversation' && data.message?.conversation) {
+        if (data.type === "new_conversation" && data.message?.conversation) {
           const conv = data.message.conversation;
 
           setConversations((prev) => {
             const exists = prev.find((c) => c.id === conv.id);
             if (exists) return prev;
 
-            toast.success(`🆕 New conversation: ${conv.subject}`, { duration: 5000 });
+            toast.success(`🆕 New conversation: ${conv.subject}`, {
+              duration: 5000, // stays for 5 seconds
+            });
             return [conv, ...prev];
           });
-        } else if (data.type === 'new_message' && data.message) {
+        }
+        else if (data.type === "new_message" && data.message) {
           const msg = data.message;
 
           setConversations((prev) => {
             const updated = prev.map((conv) => {
               if (conv.id === msg.conversationId) {
+                // Avoid adding duplicate messages
                 const alreadyExists = conv.messages?.some((m) => m.id === msg.id);
                 if (alreadyExists) return conv;
 
@@ -101,23 +103,26 @@ export function InboxView() {
               return conv;
             });
 
-            toast(`✉️ New message from ${msg.from?.email || 'someone'}`, { duration: 5000 });
+            toast(`✉️ New message from ${msg.from?.email || "someone"}`, {
+              duration: 5000, // stays for 5 seconds
+            });
             return updated;
           });
-        } else {
-          console.log('ℹ️ Unhandled message type:', data.type);
+        }
+        else {
+          console.log("ℹ️ Unhandled message type:", data.type);
         }
       } catch (err) {
-        console.error('❌ Failed to parse WebSocket message:', err, event.data);
+        console.error("❌ Failed to parse WebSocket message:", err, event.data);
       }
     };
 
     return () => {
-      console.log('🔌 Closing WebSocket connection');
+      console.log("🔌 Closing WebSocket connection");
       ws.current?.close();
-      hasConnected.current = false; // allow reconnect on tenant change
     };
   }, [tenant?.id]);
+
 
   useEffect(() => {
     if (!tenant?.id || !tokens) return;
@@ -128,68 +133,69 @@ export function InboxView() {
           `http://localhost:8000/api/inbox/conversations/?tenantId=${tenant.id}`,
           {
             headers: {
-              Authorization: `Bearer ${tokens.access_token}`,
+              'Authorization': `Bearer ${tokens?.access_token}`,
               'Content-Type': 'application/json',
             },
           }
         );
 
-        if (!res.ok) throw new Error('Failed to fetch conversations');
+        if (!res.ok) throw new Error('Failed to fetch');
+
         const data = await res.json();
+
+        // Make sure data.results is always an array (default to empty)
+        console.log("conversantion------",data.results);
         setConversations(Array.isArray(data.results) ? data.results : []);
       } catch (err) {
         console.error(err);
-        setConversations([]);
+        setConversations([]); // fallback empty array on error
       }
     }
 
     fetchConversations();
   }, [tenant, tokens]);
 
-  const filteredConversations = useMemo(() => {
-    return conversations.filter((conv) => {
-      switch (sidebarFilter) {
-        case 'unassigned':
-          return !conv.assignedTo;
-        case 'assigned-to-me':
-          return conv.assignedTo === user?.full_name;
-        case 'snoozed':
-          return conv.snoozed;
-        case 'sent':
-          return conv.messages.some((msg) => msg.from.email === user?.email);
-        case 'archived':
-          return conv.isArchived;
-        default:
-          return !conv.isArchived;
-      }
-    });
-  }, [conversations, sidebarFilter, user?.email, user?.full_name]);
+
+  // Filter conversations based on sidebarFilter
+  const filteredConversations = conversations.filter(conv => {
+    switch (sidebarFilter) {
+      case 'unassigned':
+        return !conv.assignedTo;
+      case 'assigned-to-me':
+        return conv.assignedTo === user?.full_name;
+      case 'snoozed':
+        return conv.snoozed;
+      case 'sent':
+        return conv.messages.some(msg => msg.from.email === user?.email);
+      case 'archived':
+        return conv.isArchived;
+      default:
+        return !conv.isArchived;
+    }
+  });
 
   const handleSendEmail = async (emailData: EmailData) => {
-    // Add email sending logic here
+    // ... your existing handleSendEmail implementation unchanged ...
   };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1000));
     setIsRefreshing(false);
   };
 
   const handleCreateSharedInbox = (inboxData: Partial<SharedInbox>) => {
-    // Add shared inbox creation logic here
+    // ... unchanged ...
   };
 
-  const sharedInboxesWithCounts = useMemo(() => {
-    return sharedInboxes.map((inbox) => ({
-      id: inbox.id,
-      name: inbox.name,
-      unreadCount: conversations.filter(
-        (conv) =>
-          conv.sharedInboxId === inbox.id &&
-          conv.messages.some((msg) => !msg.isRead)
-      ).length,
-    }));
-  }, [sharedInboxes, conversations]);
+  const sharedInboxesWithCounts = sharedInboxes.map(inbox => ({
+    id: inbox.id,
+    name: inbox.name,
+    unreadCount: conversations.filter(conv =>
+      conv.sharedInboxId === inbox.id &&
+      conv.messages.some(msg => !msg.isRead)
+    ).length
+  }));
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors">

@@ -1,30 +1,36 @@
-delete :
-del /s /q __pycache__\*
 for /d /r . %d in (__pycache__) do @if exist "%d" rd /s /q "%d"
 
+for /d /r . %d in (__pycache__) do @if exist "%d" rd /s /q "%d"
 
-for /r %d in (migrations) do del "%d\*.py" /q & del "%d\*.pyc" /q & echo y|del "%d\__init__.py" >nul 2>&1 & copy nul "%d\__init__.py" >nul
-
-
-That deletes all .py and .pyc files in each migrations/ folder, then re-creates an empty __init__.py file (which Django requires).
-
-
+python manage.py makemigrations
+python manage.py migrate
 
 python manage.py shell
 
 
 from apps.core.models import Client, Domain
 
-# Inspect Client fields to know what to pass
-print([f.name for f in Client._meta.get_fields()])
+# Optional: See what fields are in the Client model
+print("Client fields:", [f.name for f in Client._meta.get_fields()])
 
-# Create public tenant (adjust fields accordingly)
-public_tenant = Client(schema_name='public', name='Public Tenant')
+# Create the public tenant (make sure 'schema_name' is 'public')
+public_tenant = Client(
+    schema_name='public',
+    name='Public Tenant'
+    # Add any other required fields if defined in your Client model
+)
 public_tenant.save()
 
-# Create domain pointing to public tenant
-domain = Domain(domain='127.0.0.1', tenant=public_tenant, is_primary=True)
+# Create domain for public tenant (NO http://, just hostname)
+domain = Domain(
+    domain='public.localhost',  # <-- use this instead of 127.0.0.1
+    tenant=public_tenant,
+    is_primary=True
+)
 domain.save()
+
+print("✅ Public tenant and domain created successfully!")
+
 
 
 
@@ -83,88 +89,97 @@ else:
 
 print(public_tenant)
 exit()
-Step 5: Create the main tenant
-You need to create your main tenant (e.g., schema name main):
 
-bash
-Copy
-Edit
-python manage.py shell
-python
-Copy
-Edit
+
 from django_tenants.utils import get_tenant_model
-TenantModel = get_tenant_model()
-
-if not TenantModel.objects.filter(schema_name='main').exists():
-    main_tenant = TenantModel(schema_name='main', name='Main Tenant')
-    main_tenant.save()
-else:
-    main_tenant = TenantModel.objects.get(schema_name='main')
-
-print(main_tenant)
-exit()
-Step 6: Create Domains for tenants
-Assign domains (localhost, 127.0.0.1, public.localhost) to tenants:
-
-bash
-Copy
-Edit
-python manage.py shell
-python
-Copy
-Edit
 from apps.core.models import Domain
-from django_tenants.utils import get_tenant_model
 
+# Get the tenant model (usually your Client model)
 TenantModel = get_tenant_model()
-public_tenant = TenantModel.objects.get(schema_name='public')
-main_tenant = TenantModel.objects.get(schema_name='main')
 
-Domain.objects.update_or_create(domain='public.localhost', defaults={'tenant': public_tenant})
-Domain.objects.update_or_create(domain='localhost', defaults={'tenant': main_tenant})
-Domain.objects.update_or_create(domain='127.0.0.1', defaults={'tenant': main_tenant})
+# Create or get the 'main' tenant
+main_tenant, created_main = TenantModel.objects.get_or_create(
+    schema_name='main',
+    defaults={'name': 'Main Tenant'}
+)
+if created_main:
+    print("Created main tenant")
+else:
+    print("Main tenant already exists")
 
-exit()
+# Create or get the 'public' tenant
+public_tenant, created_public = TenantModel.objects.get_or_create(
+    schema_name='public',
+    defaults={'name': 'Public Tenant'}
+)
+if created_public:
+    print("Created public tenant")
+else:
+    print("Public tenant already exists")
+
+# Assign domains to tenants using update_or_create (safe for re-running)
+Domain.objects.update_or_create(
+    domain='public.localhost',
+    defaults={'tenant': public_tenant, 'is_primary': True}
+)
+
+Domain.objects.update_or_create(
+    domain='localhost',
+    defaults={'tenant': main_tenant, 'is_primary': True}
+)
+
+Domain.objects.update_or_create(
+    domain='127.0.0.1',
+    defaults={'tenant': main_tenant, 'is_primary': True}
+)
+
+print("✅ Domains assigned successfully.")
+
 Step 7: Run migrations on tenant schema
 You must migrate the tenant schema tables:
 
-bash
-Copy
-Edit
-python manage.py migrate_schemas --tenant=main
+python manage.py migrate_schemas -s main
+
+
 Step 8: Create superuser in the public schema
-Run:
 
-bash
-Copy
-Edit
 python manage.py createsuperuser
-This user can log in to:
 
-bash
-Copy
-Edit
 http://public.localhost:8000/superadmin/
 Step 9: Create tenant users
 To create users inside tenant schema (main):
 
-bash
-Copy
-Edit
+
 python manage.py shell
-python
-Copy
-Edit
+
 from django_tenants.utils import schema_context
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
 with schema_context('main'):
-    User.objects.create_superuser(username='tenantadmin', email='tenantadmin@example.com', password='yourpassword')
-    # Or create normal users:
-    User.objects.create_user(username='tenantuser', email='user@example.com', password='yourpassword')
+    # Create user devhiroshi77@gmail.com
+    if not User.objects.filter(username='devhiroshi77').exists():
+        User.objects.create_user(
+            username='devhiroshi77',
+            email='devhiroshi77@gmail.com',
+            password='Password123!@#'
+        )
+        print("User devhiroshi77 created in 'main' schema.")
+    else:
+        print("User devhiroshi77 already exists.")
+
+    # Create user joshua.andrews.ckr@gmail.com
+    if not User.objects.filter(username='joshua.andrews.ckr').exists():
+        User.objects.create_user(
+            username='joshua.andrews.ckr',
+            email='joshua.andrews.ckr@gmail.com',
+            password='Password123!@#'
+        )
+        print("User joshua.andrews.ckr created in 'main' schema.")
+    else:
+        print("User joshua.andrews.ckr already exists.")
+
 exit()
 Step 10: Configure your frontend/backend
 Your frontend (e.g., at localhost:3000) should call backend APIs at localhost:8000.
@@ -247,3 +262,47 @@ user.set_password(password)
 
 user.save()
 print(f"Superadmin user ready: {user.email}")
+
+
+
+from django_tenants.utils import get_tenant_model
+from apps.core.models import Domain
+
+# Step 1: Get your tenant model
+TenantModel = get_tenant_model()
+
+# Step 2: Get or create the main tenant
+main_tenant, created_main = TenantModel.objects.get_or_create(
+    schema_name='main',
+    defaults={'name': 'Main Tenant'}
+)
+if created_main:
+    print("✅ Created main tenant")
+else:
+    print("ℹ️ Main tenant already exists")
+
+# Step 3: Create or get the ngrok domain
+ngrok_domain, created_domain = Domain.objects.get_or_create(
+    domain='f5cdf3c44cad.ngrok-free.app',
+    tenant=main_tenant,
+    defaults={'is_primary': False}
+)
+
+if created_domain:
+    print("✅ Ngrok domain added to main tenant")
+else:
+    print("ℹ️ Ngrok domain already exists for this tenant")
+
+
+
+
+
+from django_tenants.utils import schema_context
+from apps.team_inbox.models import Conversation, Message
+
+with schema_context('main'):
+    Message.objects.all().delete()
+    Conversation.objects.all().delete()
+
+print("✅ Deleted all records in the 'main' schema.")
+

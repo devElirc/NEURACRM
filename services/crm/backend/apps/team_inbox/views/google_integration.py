@@ -24,54 +24,6 @@ from ...core.models import TenantEmailMapping, Client
 from django_tenants.utils import  schema_context
 
 
-# @api_view(["POST"])
-# @permission_classes([AllowAny])
-# def google_callback(request):
-#     try:
-#         data = json.loads(request.body)
-#         code, inbox_name = data.get("code"), data.get("inbox_name")
-#         if not code or not inbox_name:
-#             return JsonResponse({"error": "Missing code or inbox_name"}, status=400)
-
-#         # Exchange token
-#         token_data = exchange_code_for_token(code)
-#         access_token, refresh_token = token_data["access_token"], token_data["refresh_token"]
-
-#         # Get user email
-#         email = get_google_user_email(access_token)
-#         print("✅ Found user:")
-        
-#         user = request.user
-#         print("✅ Found user:", user)
-        
-#         tenant = user.tenant
-#         print("✅ Found tenant:", tenant)
-
-#         # Work in tenant schema
-#         with schema_context("main"):
-#             inbox, _ = Inbox.objects.get_or_create(email=email, defaults={"name": inbox_name})
-#             channel_account, _ = ChannelAccount.objects.update_or_create(
-#                 email=email,
-#                 defaults=dict(
-#                     provider="gmail",
-#                     access_token=access_token,
-#                     refresh_token=refresh_token,
-#                     expires_in=token_data["expires_in"],
-#                     token_acquired_at=timezone.now(),
-#                     inbox=inbox
-#                 )
-#             )
-#             # Gmail Watch
-#             gmail = GmailService(channel_account)
-#             watch_response = gmail.start_watch()
-#             if "historyId" in watch_response:
-#                 channel_account.last_history_id = watch_response["historyId"]
-#                 channel_account.save()
-
-#             return JsonResponse({"email": email, "inbox_id": str(inbox.id)})
-
-#     except Exception as e:
-#         return JsonResponse({"error": str(e)}, status=500)
 
 @api_view(["POST"])
 @permission_classes([AllowAny])

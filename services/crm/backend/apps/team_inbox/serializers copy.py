@@ -31,7 +31,7 @@ class ChannelAccountSerializer(serializers.ModelSerializer):
             'expires_in',
             'token_acquired_at',
             'inbox',
-            'last_history_id',
+            'last_history_id',  
         ]
         read_only_fields = ['id', 'token_acquired_at']
 
@@ -60,26 +60,37 @@ class CalendarEventSerializer(serializers.ModelSerializer):
         fields = ['id', 'message', 'title', 'start_time', 'end_time', 'created_by']
 
 
+
+
 class EmailAddressSerializer(serializers.Serializer):
     name = serializers.CharField(required=False, allow_blank=True)
     email = serializers.EmailField()
 
+
 class AttachmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Attachment
-        fields = ['id', 'filename', 'file_url', 'mime_type', 'size']
+        fields = [
+            'id', 'filename', 'file_url',
+            'mime_type', 'size'
+        ]
+
 
 class InternalNoteSerializer(serializers.ModelSerializer):
     author = serializers.StringRelatedField()
 
     class Meta:
         model = InternalNote
-        fields = ['id', 'author', 'content', 'created_at']
+        fields = [
+            'id', 'author', 'content', 'created_at'
+        ]
+
 
 class LabelSerializer(serializers.ModelSerializer):
     class Meta:
         model = Label
         fields = ['id', 'name', 'color']
+
 
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
@@ -87,13 +98,12 @@ class TagSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'color']
 
 
-
 class MessageSerializer(serializers.ModelSerializer):
     from_ = EmailAddressSerializer(source='from_email')
     to = EmailAddressSerializer(many=True)
     cc = EmailAddressSerializer(many=True, required=False, allow_null=True)
     bcc = EmailAddressSerializer(many=True, required=False, allow_null=True)
-    replyTo = serializers.SerializerMethodField()
+    replyTo = EmailAddressSerializer(source='reply_to', required=False, allow_null=True)
     threadId = serializers.CharField(source='thread_id', allow_null=True)
     messageId = serializers.CharField(source='message_id')
     inReplyTo = serializers.CharField(source='in_reply_to', required=False, allow_null=True)
@@ -135,26 +145,18 @@ class MessageSerializer(serializers.ModelSerializer):
             'source',
         ]
 
-    def get_replyTo(self, obj):
-        reply_to = obj.reply_to
-        if not reply_to:
-            return None
-        if isinstance(reply_to, list):
-            return reply_to[0] if reply_to else None
-        if isinstance(reply_to, dict):
-            return reply_to
-        return None
-
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        data['from'] = data.pop('from_')
+        data['from'] = data.pop('from_')  # Rename 'from_' back to 'from'
         return data
+
 
 class ConversationSerializer(serializers.ModelSerializer):
     participants = EmailAddressSerializer(many=True)
     tags = TagSerializer(many=True, read_only=True)
     lastMessage = MessageSerializer(source='last_message', read_only=True)
     messages = MessageSerializer(many=True, read_only=True)
+
     assignedTo = serializers.PrimaryKeyRelatedField(source='assigned_to', read_only=True)
     assignedBy = serializers.PrimaryKeyRelatedField(source='assigned_by', read_only=True)
     assignedAt = serializers.DateTimeField(source='assigned_at', format='%Y-%m-%dT%H:%M:%SZ', allow_null=True)

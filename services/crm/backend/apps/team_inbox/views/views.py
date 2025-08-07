@@ -1,10 +1,17 @@
 import json
 import base64
 import requests
+from django.core.cache import cache
+
 from django.http import JsonResponse
-from django.utils import timezone
+# from django.utils import timezone
+from datetime import datetime as dt_datetime, timezone as dt_timezone
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.serializers.json import DjangoJSONEncoder
+from django_tenants.utils import schema_context
+
 from rest_framework import viewsets, permissions
 from rest_framework.permissions import AllowAny
 from rest_framework.decorators import api_view, permission_classes
@@ -13,129 +20,442 @@ from rest_framework.response import Response
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
-from datetime import timezone as dt_timezone
 
 from ..services.gmail_service import GmailService
-from ..models import TeamMember, Inbox, ChannelAccount, Tag, Message, Comment, Task, CalendarEvent
+from ..models import TeamMember, Inbox, ChannelAccount, Tag, Message, Comment, Task, CalendarEvent, Conversation
 from ..serializers import (
     TeamMemberSerializer, InboxSerializer, ChannelAccountSerializer,
     TagSerializer, MessageSerializer, CommentSerializer,
-    TaskSerializer, CalendarEventSerializer
+    TaskSerializer, CalendarEventSerializer, ConversationSerializer
 )
 
+from email.utils import getaddresses
+
+
+from rest_framework.generics import ListAPIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.filters import OrderingFilter, SearchFilter
 
 
 User = get_user_model()
 
-from django_tenants.utils import schema_context
 from ...core.models import TenantEmailMapping, Client  # adjust if needed
 
 # ---------------- GMAIL PUSH NOTIFICATION HANDLER ---------------- #
 
+
+def parse_email_subject_and_snippet(message):
+    headers = message.get('payload', {}).get('headers', [])
+    subject = next((h['value'] for h in headers if h.get('name', '').lower() == 'subject'), None)
+    snippet = message.get('snippet', '')
+    return subject, snippet
+
+
+def parse_email_address(raw):
+    name, email = getaddresses([raw])[0] if raw else ("", "")
+    return {"name": name, "email": email}
+
+
+def parse_email_list(raw):
+    return [{"name": name, "email": email} for name, email in getaddresses([raw])] if raw else []
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 
+# def gmail_notify(request):
+#     try:
+#         print("🔔 Incoming Gmail notification webhook")
 
-# def notify_team_members(inbox, subject, snippet):
-#     for member in inbox.teammember_set.all():
-#         # Replace with real notification logic (email, socket, webhook, etc.)
-#         print(f"📨 Notify {member.user.email} -> {subject}: {snippet[:60]}")
+#         envelope = json.loads(request.body)
+#         message = envelope.get("message", {})
+#         data = message.get("data")
+
+#         if not data:
+#             return JsonResponse({"error": "No message data"}, status=400)
+
+#         payload = json.loads(base64.urlsafe_b64decode(data))
+#         incoming_history_id = payload.get("historyId")
+#         email = payload.get("emailAddress")
+
+#         print(f"📩 Gmail Notification for {email} with historyId {incoming_history_id}")
+
+#         cache_key = f"gmail_webhook_lock:{email}"
+#         if cache.get(cache_key):
+#             print("⚠️ Duplicate webhook received too soon. Skipping.")
+#             return JsonResponse({"status": "duplicate_skipped"})
+#         cache.set(cache_key, True, timeout=10)
+
+#         account = ChannelAccount.objects.get(email=email)
+
+#         schema = get_schema_for_email(email)
+#         if not schema:
+#             return JsonResponse({"error": "Tenant not found for this email"}, status=404)
+
+#         with schema_context(schema):
+#             history_id = incoming_history_id or account.last_history_id
+#             if not history_id:
+#                 print("⚠️ No valid history ID available. Skipping fetch.")
+#                 return JsonResponse({"error": "Missing historyId"}, status=400)
+
+#             gmail = GmailService(account)
+#             messages, new_history_id = gmail.fetch_new_emails(history_id)
+#             print(f"📬 {len(messages)} new message(s) fetched")
+
+#             for i, msg in enumerate(messages, start=1):
+#                 subject, snippet = parse_email_subject_and_snippet(msg)
+#                 headers = {h['name']: h['value'] for h in msg['payload']['headers']}
+
+#                 msg_id = headers.get("Message-ID", msg['id'])
+#                 thread_id = msg.get("threadId")
+#                 in_reply_to = headers.get("In-Reply-To")
+#                 references = headers.get("References")
+
+#                 from_email = parse_email_address(headers.get("From"))
+#                 to = parse_email_list(headers.get("To"))
+#                 cc = parse_email_list(headers.get("Cc"))
+#                 bcc = parse_email_list(headers.get("Bcc"))
+#                 reply_to = parse_email_list(headers.get("Reply-To"))
+
+#                 received_at = int(msg.get("internalDate", 0)) / 1000.0
+#                 timestamp = dt_datetime.fromtimestamp(received_at, tz=dt_timezone.utc)
+
+
+#                 if Message.objects.filter(message_id=msg_id).exists():
+#                     print(f"⚠️ Message with ID {msg_id} already exists. Skipping.")
+#                     continue
+
+#                 conversation, created = Conversation.objects.get_or_create(
+#                     thread_id=thread_id,
+#                     defaults={
+#                         "subject": subject or "(No Subject)",
+#                         "channel": "email",
+#                         "priority": "normal",
+#                         "status": "open",
+#                         "last_activity": timestamp,
+#                         "shared_inbox_id": account.inbox.id,
+#                     }
+#                 )
+
+#                 message = Message.objects.create(
+#                     conversation=conversation,
+#                     message_id=msg_id,
+#                     thread_id=thread_id,
+#                     in_reply_to=in_reply_to,
+#                     references=[r.strip() for r in references.split()] if references else None,
+#                     subject=subject or "(No Subject)",
+#                     from_email=from_email,
+#                     to=to,
+#                     cc=cc or None,
+#                     bcc=bcc or None,
+#                     reply_to=reply_to or None,
+#                     content=snippet,
+#                     html_content=None,
+#                     timestamp=timestamp,
+#                     inbox=account.inbox,
+#                     source='incoming',
+#                     priority='normal',
+#                 )
+
+#                 conversation.last_activity = timestamp
+#                 conversation.last_message = message
+#                 conversation.save(update_fields=["last_activity", "last_message"])
+
+#                 group_name = f'inbox_{account.inbox.id}'
+
+#                 if created:
+#                     # Emit new_conversation event
+#                     ws_payload = {
+#                         'type': 'new_conversation',
+#                         'message': {
+#                             'type': 'new_conversation',
+#                             'conversation': {
+#                                 'id': str(conversation.id),
+#                                 'threadId': conversation.thread_id,
+#                                 'subject': conversation.subject,
+#                                 'participants': [
+#                                     {'email': message.from_email, 'name': ''},
+#                                     *[
+#                                         {'email': m['email'], 'name': m.get('name', '')}
+#                                         if isinstance(m, dict) else {'email': m, 'name': ''}
+#                                         for m in (message.to or [])
+#                                     ]
+#                                 ],
+#                                 'tags': [],
+#                                 'status': conversation.status,
+#                                 'priority': conversation.priority,
+#                                 'lastActivity': conversation.last_activity.isoformat(),
+#                                 'lastMessage': {
+#                                     'id': str(message.id),
+#                                     'threadId': message.thread_id,
+#                                     'from': {'email': message.from_email, 'name': ''},
+#                                     'to': [
+#                                         {'email': m['email'], 'name': m.get('name', '')}
+#                                         if isinstance(m, dict) else {'email': m, 'name': ''}
+#                                         for m in (message.to or [])
+#                                     ],
+#                                     'subject': message.subject,
+#                                     'content': message.content,
+#                                     'timestamp': message.timestamp.isoformat(),
+#                                     'isRead': False,
+#                                     'isStarred': False,
+#                                     'isDraft': False,
+#                                     'messageId': message.message_id,
+#                                     'attachments': [],
+#                                     'internalNotes': [],
+#                                     'labels': [],
+#                                     'priority': message.priority,
+#                                     'source': message.source,
+#                                 },
+#                                 'channel': conversation.channel,
+#                                 'isArchived': conversation.is_archived,
+#                                 'createdAt': conversation.created_at.isoformat(),
+#                                 'updatedAt': conversation.updated_at.isoformat(),
+#                                 'messages': [],
+#                             }
+#                         }
+#                     }
+#                 else:
+#                     # Emit new_message event
+#                     ws_payload = {
+#                         'type': 'new_message',
+#                         'message': {
+#                             'type': 'new_message',
+#                             'conversationId': str(conversation.id),
+#                             'message': {
+#                                 'id': str(message.id),
+#                                 'threadId': message.thread_id,
+#                                 'from': {'email': message.from_email, 'name': ''},
+#                                 'to': [
+#                                     {'email': m['email'], 'name': m.get('name', '')}
+#                                     if isinstance(m, dict) else {'email': m, 'name': ''}
+#                                     for m in (message.to or [])
+#                                 ],
+#                                 'subject': message.subject,
+#                                 'content': message.content,
+#                                 'timestamp': message.timestamp.isoformat(),
+#                                 'isRead': False,
+#                                 'isStarred': False,
+#                                 'isDraft': False,
+#                                 'messageId': message.message_id,
+#                                 'attachments': [],
+#                                 'internalNotes': [],
+#                                 'labels': [],
+#                                 'priority': message.priority,
+#                                 'source': message.source,
+#                             }
+#                         }
+#                     }
+
+#                 # Debug print
+#                 print("📤 WebSocket payload:\n", json.dumps(ws_payload, indent=2))
+
+#                 # Broadcast via WebSocket
+#                 async_to_sync(get_channel_layer().group_send)(
+#                     group_name,
+#                     ws_payload
+#                 )
+
+#                 print(f"✅ [{i}] Message saved and broadcasted. {'(new conversation)' if created else '(reply)'}")
+
+#             if new_history_id:
+#                 account.last_history_id = new_history_id
+#                 account.save(update_fields=["last_history_id"])
+#                 print(f"🧭 Updated last_history_id to {new_history_id}")
+
+#         return JsonResponse({"status": "ok"})
+
+#     except Exception as e:
+#         print("❌ Error in gmail_notify:", str(e))
+#         return JsonResponse({"error": str(e)}, status=500)
+
+
 
 def gmail_notify(request):
     try:
         print("🔔 Incoming Gmail notification webhook")
-        
 
         envelope = json.loads(request.body)
-        print("📦 Envelope parsed:", envelope)
-
         message = envelope.get("message", {})
         data = message.get("data")
 
         if not data:
-            print("⚠️ No message data in envelope")
             return JsonResponse({"error": "No message data"}, status=400)
 
-        payload = json.loads(base64.urlsafe_b64decode(data))
-        history_id = payload.get("historyId")
+        payload = json.loads(base64.urlsafe_b64decode(data).decode('utf-8'))
+        incoming_history_id = payload.get("historyId")
         email = payload.get("emailAddress")
-        
-        
 
-        print(f"📩 Gmail Notification for {email} with historyId {history_id}")
-        print("🔍 Switching to tenant schema...")
-        
-        # with schema_context("public"):
-        #     try:
-        #         mapping = TenantEmailMapping.objects.get(email=email)
-        #         tenant = mapping.tenant
-        #         print("🏢 Found tenant:", tenant.schema_name)
-        #     except TenantEmailMapping.DoesNotExist:
-        #         print("❌ No tenant mapping for this email")
-        #         return JsonResponse({"error": "No tenant mapping for this email"}, status=404)
+        print(f"📩 Gmail Notification for {email} with historyId {incoming_history_id}")
 
+        cache_key = f"gmail_webhook_lock:{email}"
+        if cache.get(cache_key):
+            print("⚠️ Duplicate webhook received too soon. Skipping.")
+            return JsonResponse({"status": "duplicate_skipped"})
+        cache.set(cache_key, True, timeout=10)
 
-        with schema_context("main"):  # TODO: dynamic schema from email
-        # with schema_context(tenant.schema_name):
-            account = ChannelAccount.objects.get(email=email)
-            print("✅ Found ChannelAccount:", account)
+        account = ChannelAccount.objects.get(email=email)
+
+        tenant = get_tenant_for_email(email)
+        if not tenant:
+            return JsonResponse({"error": "Tenant not found for this email"}, status=404)
+
+        with schema_context(tenant.schema_name):
+            history_id = incoming_history_id or account.last_history_id
+            if not history_id:
+                print("⚠️ No valid history ID available. Skipping fetch.")
+                return JsonResponse({"error": "Missing historyId"}, status=400)
 
             gmail = GmailService(account)
-            messages = gmail.fetch_new_emails(history_id)
-
+            messages, new_history_id = gmail.fetch_new_emails(history_id)
             print(f"📬 {len(messages)} new message(s) fetched")
 
-        for i, msg in enumerate(messages, start=1):
-            subject, snippet = parse_email_subject_and_snippet(msg)
-            headers = {h['name']: h['value'] for h in msg['payload']['headers']}
-            sender = headers.get("From", "")
-            recipient = headers.get("To", "")
-            received_at = int(msg.get("internalDate", 0)) / 1000.0  # Gmail timestamp in ms
+            for i, msg in enumerate(messages, start=1):
+                subject, snippet = parse_email_subject_and_snippet(msg)
+                headers = {h['name']: h['value'] for h in msg['payload']['headers']}
 
-            print(f"✉️ [{i}] Subject: {subject}")
-            print(f"📝 Snippet: {snippet[:100]}")
+                msg_id = headers.get("Message-ID", msg['id'])
+                thread_id = msg.get("threadId")
+                in_reply_to = headers.get("In-Reply-To")
+                references = headers.get("References")
 
-            # Check if message already exists
-            if not Message.objects.filter(message_id=msg['id']).exists():
-                message = Message.objects.create(
-                    message_id=msg['id'],
-                    subject=subject,
-                    sender=sender,
-                    recipient=recipient,
-                    body=snippet,
-                    received_at=timezone.now(),
-                    inbox=account.inbox
-                )
+                from_email = parse_email_address(headers.get("From"))
+                to = parse_email_list(headers.get("To"))
+                cc = parse_email_list(headers.get("Cc"))
+                bcc = parse_email_list(headers.get("Bcc"))
+                reply_to = parse_email_list(headers.get("Reply-To"))
 
-                # ✅ Broadcast to WebSocket group
-                # group_name = f'inbox_{tenant.id}'  # or use tenant.id directly if available
-                # print(f"group_name: {group_name}")
-                
-                group_name = f'inbox_2'  # or use tenant.id directly if available
-                print(f"group_name: {group_name}")
-                
-                channel_layer = get_channel_layer()
-                async_to_sync(channel_layer.group_send)(
-                    group_name,
-                    {
-                        'type': 'inbox_message',
-                        'message': {
-                            'id': str(message.id),
-                            'subject': message.subject,
-                            'sender': message.sender,
-                            'body': message.body[:100],
-                        }
+                received_at = int(msg.get("internalDate", 0)) / 1000.0
+                timestamp = dt_datetime.fromtimestamp(received_at, tz=dt_timezone.utc)
+
+                if Message.objects.filter(message_id=msg_id).exists():
+                    print(f"⚠️ Message with ID {msg_id} already exists. Skipping.")
+                    continue
+
+                conversation, created = Conversation.objects.get_or_create(
+                    thread_id=thread_id,
+                    defaults={
+                        "subject": subject or "(No Subject)",
+                        "channel": "email",
+                        "priority": "normal",
+                        "status": "open",
+                        "last_activity": timestamp,
+                        "shared_inbox_id": account.inbox.id,
                     }
                 )
 
-                print(f"📢 WebSocket broadcast sent to group {group_name}")
+                message = Message.objects.create(
+                    conversation=conversation,
+                    message_id=msg_id,
+                    thread_id=thread_id,
+                    in_reply_to=in_reply_to,
+                    references=[r.strip() for r in references.split()] if references else None,
+                    subject=subject or "(No Subject)",
+                    from_email=from_email,
+                    to=to,
+                    cc=cc or None,
+                    bcc=bcc or None,
+                    reply_to=reply_to[0] if reply_to else None,  # Assuming reply_to is list, use first item or None
+                    content=snippet,
+                    html_content=None,
+                    timestamp=timestamp,
+                    inbox=account.inbox,
+                    source='incoming',
+                    priority='normal',
+                )
 
-            else:
-                print(f"⚠️ Message with ID {msg['id']} already exists. Skipping insert.")
+                conversation.last_activity = timestamp
+                conversation.last_message = message
+                conversation.save(update_fields=["last_activity", "last_message"])
 
+                # Prepare websocket payload helper function to avoid duplication
+                def message_payload(msg_obj):
+                    ws_from = {
+                        'email': msg_obj.from_email.get('email'),
+                        'name': msg_obj.from_email.get('name', '')
+                    }
+                    ws_to = [
+                        {'email': m['email'], 'name': m.get('name', '')} if isinstance(m, dict) else {'email': m, 'name': ''}
+                        for m in (msg_obj.to or [])
+                    ]
+                    return {
+                        'id': str(msg_obj.id),
+                        'threadId': msg_obj.thread_id,
+                        'from': ws_from,
+                        'to': ws_to,
+                        'subject': msg_obj.subject,
+                        'content': msg_obj.content,
+                        'timestamp': msg_obj.timestamp.isoformat(),
+                        'isRead': False,
+                        'isStarred': False,
+                        'isDraft': False,
+                        'messageId': msg_obj.message_id,
+                        'attachments': [],  # You can add attachments if needed
+                        'internalNotes': [],
+                        'labels': [],
+                        'priority': msg_obj.priority,
+                        'source': msg_obj.source,
+                    }
 
+                group_name = f"tenant_{tenant.id}"
+                if created:
+                    ws_payload = {
+                        'type': 'new_conversation',
+                        'message': {
+                            'type': 'new_conversation',
+                            'conversation': {
+                                'id': str(conversation.id),
+                                'threadId': conversation.thread_id,
+                                'subject': conversation.subject,
+                                'participants': [
+                                    {
+                                        'email': message.from_email.get('email'),
+                                        'name': message.from_email.get('name', '')
+                                    },
+                                    *[
+                                        {'email': m['email'], 'name': m.get('name', '')}
+                                        if isinstance(m, dict) else {'email': m, 'name': ''}
+                                        for m in (message.to or [])
+                                    ]
+                                ],
+                                'tags': [],
+                                'status': conversation.status,
+                                'priority': conversation.priority,
+                                'lastActivity': conversation.last_activity.isoformat(),
+                                'lastMessage': message_payload(message),
+                                'channel': conversation.channel,
+                                'isArchived': conversation.is_archived,
+                                'createdAt': conversation.created_at.isoformat(),
+                                'updatedAt': conversation.updated_at.isoformat(),
+                                'messages': [message_payload(message)],
+                            }
+                        }
+                    }
+                else:
+                    ws_payload = {
+                        'type': 'new_message',
+                        'message': {
+                            'type': 'new_message',
+                            'conversationId': str(conversation.id),
+                            'messages': [message_payload(message)],
+                        }
+                    }
 
-        print("✅ All messages saved successfully")
+                print("📤 WebSocket payload:\n", json.dumps(ws_payload, indent=2))
+
+                async_to_sync(get_channel_layer().group_send)(
+                    group_name,
+                    ws_payload
+                )
+
+                print(f"✅ [{i}] Message saved and broadcasted. {'(new conversation)' if created else '(reply)'}")
+
+            if new_history_id:
+                account.last_history_id = new_history_id
+                account.save(update_fields=["last_history_id"])
+                print(f"🧱 Updated last_history_id to {new_history_id}")
+
         return JsonResponse({"status": "ok"})
 
     except Exception as e:
@@ -143,15 +463,12 @@ def gmail_notify(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-def parse_email_subject_and_snippet(message):
-    """
-    Extracts the Subject and snippet from Gmail message.
-    """
-    headers = message.get('payload', {}).get('headers', [])
-    subject = next((h['value'] for h in headers if h.get('name', '').lower() == 'subject'), None)
-    snippet = message.get('snippet', '')
-    return subject, snippet
-
+def get_tenant_for_email(email: str):
+    with schema_context("public"):
+        mapping = TenantEmailMapping.objects.filter(email=email).first()
+        if mapping and mapping.tenant:
+            return mapping.tenant
+    return None
 
 def refresh_access_token(channel_account):
     """
@@ -170,8 +487,6 @@ def refresh_access_token(channel_account):
         channel_account.token_acquired_at = timezone.now()
         channel_account.save()
     return channel_account.access_token
-
-
 
 # ---------------- VIEWSETS ---------------- #
 
@@ -210,26 +525,6 @@ class TagViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
 
-class MessageViewSet(viewsets.ModelViewSet):
-    queryset = Message.objects.all()
-    serializer_class = MessageSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        user = self.request.user
-        qs = Message.objects.all()
-
-        inbox_id = self.request.query_params.get('inbox')
-        if inbox_id:
-            qs = qs.filter(inbox_id=inbox_id)
-
-        assigned_to_me = self.request.query_params.get('assigned_to_me')
-        if assigned_to_me == 'true':
-            qs = qs.filter(assigned_to=user)
-
-        return qs
-
-
 class CommentViewSet(viewsets.ModelViewSet):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
@@ -247,4 +542,4 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
     serializer_class = CalendarEventSerializer
     permission_classes = [permissions.IsAuthenticated]
     
-    
+

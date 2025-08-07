@@ -9,10 +9,10 @@ interface ConversationListProps {
   onSelectConversation: (conversation: Conversation) => void;
 }
 
-export function ConversationList({ 
-  conversations, 
-  selectedConversation, 
-  onSelectConversation 
+export function ConversationList({
+  conversations,
+  selectedConversation,
+  onSelectConversation
 }: ConversationListProps) {
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -40,7 +40,7 @@ export function ConversationList({
           <h2 className="text-lg font-semibold text-gray-900">Conversations</h2>
           <div className="text-sm text-gray-500">{conversations.length} total</div>
         </div>
-        
+
         <div className="mt-3">
           <input
             type="text"
@@ -55,15 +55,20 @@ export function ConversationList({
           const isSelected = selectedConversation?.id === conversation.id;
           const lastMessage = conversation.messages[conversation.messages.length - 1];
           const hasAttachments = lastMessage?.attachments && lastMessage.attachments.length > 0;
-          const hasUnreadMessages = conversation.messages.some(msg => !msg.isRead);
+          // const hasUnreadMessages = conversation.messages.some(msg => !msg.isRead);
+
+          const messagesArray = Array.isArray(conversation.messages)
+            ? conversation.messages
+            : [conversation.messages];
+
+          const hasUnreadMessages = messagesArray.some(msg => !msg.isRead);
 
           return (
             <div
               key={conversation.id}
               onClick={() => onSelectConversation(conversation)}
-              className={`p-4 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50 ${
-                isSelected ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
-              }`}
+              className={`p-4 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50 ${isSelected ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
+                }`}
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center space-x-2 flex-1 min-w-0">
@@ -71,9 +76,8 @@ export function ConversationList({
                   {conversation.priority !== 'low' && (
                     <AlertTriangle className={`h-4 w-4 ${getPriorityColor(conversation.priority)}`} />
                   )}
-                  <h3 className={`text-sm font-medium truncate ${
-                    hasUnreadMessages ? 'text-gray-900' : 'text-gray-700'
-                  }`}>
+                  <h3 className={`text-sm font-medium truncate ${hasUnreadMessages ? 'text-gray-900' : 'text-gray-700'
+                    }`}>
                     {conversation.subject}
                   </h3>
                 </div>
@@ -95,14 +99,17 @@ export function ConversationList({
                   )}
                 </div>
                 <span className="text-xs text-gray-500">
-                  {formatDistanceToNow(conversation.lastActivity)}
+                  {conversation.lastActivity
+                    ? formatDistanceToNow(new Date(conversation.lastActivity))
+                    : 'No activity'}
                 </span>
               </div>
 
               {lastMessage && (
                 <p className="text-sm text-gray-600 line-clamp-2 mb-2">
-                  {lastMessage.content.substring(0, 120)}...
+                  {lastMessage?.content?.substring(0, 120) || "No message content"}...
                 </p>
+
               )}
 
               <div className="flex items-center justify-between">
@@ -120,12 +127,11 @@ export function ConversationList({
                     <span className="text-xs text-gray-500">+{conversation.tags.length - 2}</span>
                   )}
                 </div>
-                
+
                 <div className="flex items-center space-x-2">
-                  <span className={`inline-block w-2 h-2 rounded-full ${
-                    conversation.status === 'open' ? 'bg-green-400' :
+                  <span className={`inline-block w-2 h-2 rounded-full ${conversation.status === 'open' ? 'bg-green-400' :
                     conversation.status === 'pending' ? 'bg-yellow-400' : 'bg-gray-400'
-                  }`} />
+                    }`} />
                   {hasUnreadMessages && (
                     <div className="w-2 h-2 bg-blue-500 rounded-full" />
                   )}
