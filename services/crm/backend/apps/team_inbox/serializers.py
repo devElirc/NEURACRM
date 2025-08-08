@@ -88,6 +88,70 @@ class TagSerializer(serializers.ModelSerializer):
 
 
 
+# class MessageSerializer(serializers.ModelSerializer):
+#     from_ = EmailAddressSerializer(source='from_email')
+#     to = EmailAddressSerializer(many=True)
+#     cc = EmailAddressSerializer(many=True, required=False, allow_null=True)
+#     bcc = EmailAddressSerializer(many=True, required=False, allow_null=True)
+#     replyTo = serializers.SerializerMethodField()
+#     threadId = serializers.CharField(source='thread_id', allow_null=True)
+#     messageId = serializers.CharField(source='message_id')
+#     inReplyTo = serializers.CharField(source='in_reply_to', required=False, allow_null=True)
+#     references = serializers.ListField(child=serializers.CharField(), allow_null=True)
+#     htmlContent = serializers.CharField(source='html_content', required=False, allow_null=True)
+#     isRead = serializers.BooleanField(source='is_read')
+#     isStarred = serializers.BooleanField(source='is_starred')
+#     isDraft = serializers.BooleanField(source='is_draft')
+#     attachments = AttachmentSerializer(many=True, read_only=True)
+#     internalNotes = InternalNoteSerializer(many=True, source='internal_notes', read_only=True)
+#     labels = LabelSerializer(many=True, read_only=True)
+#     priority = serializers.ChoiceField(choices=Message.PRIORITY_CHOICES)
+#     source = serializers.ChoiceField(choices=Message.SOURCE_CHOICES)
+
+#     class Meta:
+#         model = Message
+#         fields = [
+#             'id',
+#             'threadId',
+#             'from_',
+#             'to',
+#             'cc',
+#             'bcc',
+#             'replyTo',
+#             'subject',
+#             'content',
+#             'htmlContent',
+#             'timestamp',
+#             'isRead',
+#             'isStarred',
+#             'isDraft',
+#             'messageId',
+#             'inReplyTo',
+#             'references',
+#             'attachments',
+#             'internalNotes',
+#             'labels',
+#             'priority',
+#             'source',
+#         ]
+
+#     def get_replyTo(self, obj):
+#         reply_to = obj.reply_to
+#         if not reply_to:
+#             return None
+#         if isinstance(reply_to, list):
+#             return reply_to[0] if reply_to else None
+#         if isinstance(reply_to, dict):
+#             return reply_to
+#         return None
+
+#     def to_representation(self, instance):
+#         data = super().to_representation(instance)
+#         data['from'] = data.pop('from_')
+#         return data\
+
+
+
 class MessageSerializer(serializers.ModelSerializer):
     from_ = EmailAddressSerializer(source='from_email')
     to = EmailAddressSerializer(many=True)
@@ -149,6 +213,23 @@ class MessageSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         data['from'] = data.pop('from_')
         return data
+
+    def create(self, validated_data):
+        # Just create the Message; conversation linking happens in the view
+        from_email = validated_data.pop('from_email')
+        to_list = validated_data.pop('to', [])
+        cc_list = validated_data.pop('cc', None)
+        bcc_list = validated_data.pop('bcc', None)
+
+        message = Message.objects.create(
+            from_email=from_email,
+            to=to_list,
+            cc=cc_list,
+            bcc=bcc_list,
+            **validated_data
+        )
+        return message
+
 
 class ConversationSerializer(serializers.ModelSerializer):
     participants = EmailAddressSerializer(many=True)

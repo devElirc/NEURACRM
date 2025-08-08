@@ -283,7 +283,7 @@ else:
 
 # Step 3: Create or get the ngrok domain
 ngrok_domain, created_domain = Domain.objects.get_or_create(
-    domain='f5cdf3c44cad.ngrok-free.app',
+    domain='898f51d52b84.ngrok-free.app',
     tenant=main_tenant,
     defaults={'is_primary': False}
 )

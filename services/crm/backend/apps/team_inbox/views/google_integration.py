@@ -100,3 +100,4 @@ def get_google_user_email(access_token):
     })
     response.raise_for_status()
     return response.json().get("email")
+

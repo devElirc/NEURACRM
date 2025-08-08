@@ -1,14 +1,14 @@
 import React, { useState, useRef } from 'react';
 import { useAuth } from '../../../auth/AuthProvider'
-import { 
-  Send, 
-  Paperclip, 
-  Image, 
-  Smile, 
-  AtSign, 
-  X, 
-  Bold, 
-  Italic, 
+import {
+  Send,
+  Paperclip,
+  Image,
+  Smile,
+  AtSign,
+  X,
+  Bold,
+  Italic,
   Underline,
   Link,
   AlignLeft,
@@ -43,32 +43,32 @@ interface EmailData {
   threadId?: string;
 }
 
-export function EmailComposer({ 
-  to = '', 
-  subject = '', 
-  onSend, 
-  onCancel, 
+export function EmailComposer({
+  to = '',
+  subject = '',
+  onSend,
+  onCancel,
   isReply = false,
-  threadId 
+  threadId
 }: EmailComposerProps) {
   const { user } = useAuth();
+  // const [formData, setFormData] = useState({
+  //   to: to,
+  //   cc: '',
+  //   bcc: '',
+  //   subject: isReply && !subject.startsWith('Re:') ? `Re: ${subject}` : subject,
+  //   content: '',
+  //   htmlContent: ''
+  // });
+
   const [formData, setFormData] = useState({
-    to: to,
+    to: to || 'develirc@gmail.com',
     cc: '',
     bcc: '',
-    subject: isReply && !subject.startsWith('Re:') ? `Re: ${subject}` : subject,
-    content: '',
-    htmlContent: ''
+    subject: isReply && !subject.startsWith('Re:') ? `Re: ${subject}` : (subject || 'Test Subject'),
+    content: 'Hello,\n\nThis is a default message.',
+    htmlContent: '<p>Hello,<br><br>This is a default message.</p>'
   });
-
-//   const [formData, setFormData] = useState({
-//   to: to || 'demo@example.com',
-//   cc: '',
-//   bcc: '',
-//   subject: isReply && !subject.startsWith('Re:') ? `Re: ${subject}` : (subject || 'Test Subject'),
-//   content: 'Hello,\n\nThis is a default message.',
-//   htmlContent: '<p>Hello,<br><br>This is a default message.</p>'
-// });
 
   const [showCcBcc, setShowCcBcc] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -79,9 +79,9 @@ export function EmailComposer({
 
   const handleSend = async () => {
     if (!formData.to.trim() || !formData.content.trim()) return;
-    
+
     setIsSending(true);
-    
+
     try {
       const emailData: EmailData = {
         to: formData.to.split(',').map(email => email.trim()).filter(Boolean),
@@ -96,7 +96,7 @@ export function EmailComposer({
       };
 
       console.log("send")
-      
+
       await onSend(emailData);
     } catch (error) {
       console.error('Failed to send email:', error);
@@ -278,13 +278,13 @@ export function EmailComposer({
             style={{ whiteSpace: 'pre-wrap' }}
             onInput={(e) => {
               const target = e.target as HTMLDivElement;
-              setFormData(prev => ({ 
-                ...prev, 
+              setFormData(prev => ({
+                ...prev,
                 content: target.textContent || '',
-                htmlContent: target.innerHTML 
+                htmlContent: target.innerHTML
               }));
             }}
-            // placeholder="Type your message..."
+          // placeholder="Type your message..."
           />
         </div>
 

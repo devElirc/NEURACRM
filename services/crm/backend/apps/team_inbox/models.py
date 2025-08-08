@@ -212,16 +212,6 @@ class Message(models.Model):
         return self.subject
 
 
-# class Attachment(models.Model):
-#     message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name='attachments')
-#     filename = models.CharField(max_length=255)
-#     file_url = models.URLField()
-#     mime_type = models.CharField(max_length=100)
-#     size = models.IntegerField()  # in bytes
-
-#     def __str__(self):
-#         return self.filename
-
 class Attachment(models.Model):
     message = models.ForeignKey(
         Message,

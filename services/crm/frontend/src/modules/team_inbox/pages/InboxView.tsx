@@ -11,7 +11,7 @@ import { mockSharedInboxes } from '../data/mockData';
 import toast, { Toaster } from 'react-hot-toast';
 
 import { Plus, RefreshCw, Settings, Filter } from 'lucide-react';
-
+import { v4 as uuidv4 } from 'uuid';
 
 
 interface EmailData {
@@ -165,9 +165,77 @@ export function InboxView() {
     });
   }, [conversations, sidebarFilter, user?.email, user?.full_name]);
 
+
   const handleSendEmail = async (emailData: EmailData) => {
-    // Add email sending logic here
+    try {
+      const isNewConversation = !emailData.threadId;
+      const threadId = emailData.threadId || uuidv4();
+
+      const payload = {
+        threadId,
+        from_: { email: user?.email || '', name: `${user?.full_name}` },
+        to: emailData.to.map(email => ({ email, name: email.split('@')[0] })),
+        cc: emailData.cc.map(email => ({ email, name: email.split('@')[0] })),
+        bcc: emailData.bcc.map(email => ({ email, name: email.split('@')[0] })),
+        subject: emailData.subject,
+        content: emailData.content,
+        htmlContent: emailData.htmlContent,
+        timestamp: new Date().toISOString(),
+        isRead: true,
+        isStarred: false,
+        isDraft: false,
+        messageId: 'msg-' + Date.now(),
+        references: [],
+        priority: 'normal',
+        source: 'outgoing'
+      };
+
+
+      const res = await fetch('http://localhost:8000/api/inbox/messages/', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokens.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        console.error(await res.json());
+        return;
+      }
+
+      const data = await res.json(); // Expecting backend to return { message, conversation }
+
+      console.log('Message + conversation from backend:', data);
+
+      if (isNewConversation) {
+        // Backend should return the full conversation here
+        setConversations(prev => [data.conversation, ...prev]);
+      } else {
+        // Append message to existing conversation
+        setConversations(prev =>
+          prev.map(conv =>
+            conv.threadId === threadId
+              ? {
+                ...conv,
+                messages: [...conv.messages, data.message],
+                lastMessage: data.message,
+                lastActivity: new Date(data.message.timestamp),
+                updatedAt: new Date(data.message.timestamp)
+              }
+              : conv
+          )
+        );
+      }
+
+      setShowComposer(false);
+    } catch (error) {
+      console.error('Failed to send email:', error);
+    }
   };
+
+
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
