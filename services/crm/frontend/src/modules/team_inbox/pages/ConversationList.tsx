@@ -34,8 +34,8 @@ export function ConversationList({
   };
 
   return (
-    <div className="w-96 bg-white border-r border-gray-200 flex flex-col">
-      <div className="p-4 border-b border-gray-200">
+    <div className="w-96 h-screen flex flex-col bg-white border-r border-gray-200">
+      <div className="p-4 border-b border-gray-200 flex-shrink-0">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">Conversations</h2>
           <div className="text-sm text-gray-500">{conversations.length} total</div>
@@ -50,12 +50,14 @@ export function ConversationList({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {conversations.map((conversation) => {
+      <div
+        className="flex-grow overflow-y-auto pb-4"
+        style={{ scrollPaddingBottom: '1rem' }}
+      >
+        {conversations.map((conversation, index) => {
           const isSelected = selectedConversation?.id === conversation.id;
           const lastMessage = conversation.messages[conversation.messages.length - 1];
           const hasAttachments = lastMessage?.attachments && lastMessage.attachments.length > 0;
-          // const hasUnreadMessages = conversation.messages.some(msg => !msg.isRead);
 
           const messagesArray = Array.isArray(conversation.messages)
             ? conversation.messages
@@ -109,7 +111,6 @@ export function ConversationList({
                 <p className="text-sm text-gray-600 line-clamp-2 mb-2">
                   {lastMessage?.content?.substring(0, 120) || "No message content"}...
                 </p>
-
               )}
 
               <div className="flex items-center justify-between">
@@ -140,6 +141,9 @@ export function ConversationList({
             </div>
           );
         })}
+
+        {/* Spacer div to ensure last item is not clipped */}
+        <div style={{ height: 130 }} />
       </div>
     </div>
   );

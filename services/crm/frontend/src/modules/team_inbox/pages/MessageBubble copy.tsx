@@ -19,13 +19,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const [showActions, setShowActions] = useState(false);
   const [showInternalNotes, setShowInternalNotes] = useState(false);
 
-  // console.log("message", message);
+  console.log("message", message);
 
-  // // const isIncoming = !message.from.includes('@yourcompany.com');
-  // const isIncoming = !message.from.email.includes('devhiroshi77@gmail.com');
-  // console.log("isIncoming", isIncoming);
-  const senderEmail = message.from?.email || "";
-  const isIncoming = !senderEmail.includes('devhiroshi77@gmail.com');
+  // const isIncoming = !message.from.includes('@yourcompany.com');
+  const isIncoming = !message.from.email.includes('devhirohi@gmail.com');
+
 
   return (
     <div

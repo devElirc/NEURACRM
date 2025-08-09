@@ -1,28 +1,90 @@
 import React, { useState } from 'react';
 import { Conversation } from '../types';
 import { Send, Paperclip, Image, Smile, AtSign, X } from 'lucide-react';
+import { useAuth } from '../../../auth/AuthProvider';
 
 interface ComposeMessageProps {
   conversation: Conversation;
-  onSend: () => void;
+  onSend: (emailData: any) => void;
   onCancel: () => void;
 }
 
 export function ComposeMessage({ conversation, onSend, onCancel }: ComposeMessageProps) {
   const [message, setMessage] = useState('');
-  const [to, setTo] = useState(conversation.participants.join(', '));
+  const [to, setTo] = useState(
+    conversation.participants.map(p => p.email).join(', ')
+  );
+
   const [cc, setCc] = useState('');
   const [bcc, setBcc] = useState('');
   const [showCcBcc, setShowCcBcc] = useState(false);
+  const { user, tokens, tenant } = useAuth();
 
-  const handleSend = () => {
-    if (message.trim()) {
-      // Here you would typically send the message to your backend
-      console.log('Sending message:', { to, cc, bcc, message });
-      onSend();
+
+
+  const handleSend = async () => {
+    if (!message.trim()) return;
+
+    try {
+      const threadId = conversation.threadId; // reply stays in same thread
+
+      const payload = {
+        threadId,
+        // from_: { email: user?.email || '', name: `${user?.full_name}` },
+        from_: { email: 'devhiroshi77@gmail.com', name: "hiroshi" },
+        to: to.split(',').map(email => ({
+          email: email.trim(),
+          name: email.trim().split('@')[0],
+        })),
+        cc: cc
+          ? cc.split(',').map(email => ({
+            email: email.trim(),
+            name: email.trim().split('@')[0],
+          }))
+          : [],
+        bcc: bcc
+          ? bcc.split(',').map(email => ({
+            email: email.trim(),
+            name: email.trim().split('@')[0],
+          }))
+          : [],
+        subject: conversation.subject || '(No Subject)',
+        content: message,
+        htmlContent: `<p>${message}</p>`,
+        timestamp: new Date().toISOString(),
+        isRead: true,
+        isStarred: false,
+        isDraft: false,
+        messageId: 'msg-' + Date.now(),
+        references: [],
+        priority: 'normal',
+        source: 'outgoing',
+      };
+
+      const res = await fetch('http://localhost:8000/api/inbox/messages/', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokens.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        console.error(await res.json());
+        return;
+      }
+
+      const data = await res.json(); // Expecting backend to return { message, conversation }
+
+      // Clear the input and close composer
       setMessage('');
+      onSend(data);
+    } catch (error) {
+      console.error('Failed to send reply:', error);
     }
   };
+
 
   return (
     <div className="bg-white border rounded-lg shadow-sm">

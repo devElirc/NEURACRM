@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Conversation, Contact } from '../types';
 import { MessageBubble } from './MessageBubble';
 import { ComposeMessage } from './ComposeMessage';
@@ -8,13 +8,28 @@ import { InternalDiscussion } from './InternalDiscussion';
 interface ConversationViewProps {
   conversation: Conversation | null;
   onContactSelect: (contact: Contact | null) => void;
+  onReply: (emailData: any) => void; 
 }
 
-export function ConversationView({ conversation, onContactSelect }: ConversationViewProps) {
+export function ConversationView({ conversation, onContactSelect, onReply }: ConversationViewProps) {
   const [activeTab, setActiveTab] = useState<'messages' | 'internal'>('messages');
   const [showCompose, setShowCompose] = useState(false);
+  const [currentConversation, setCurrentConversation] = useState(conversation);
 
-  if (!conversation) {
+
+  const handleReply = (emailData: any) => {
+    onReply(emailData);
+    setShowCompose(false);
+    setCurrentConversation(emailData.conversation);
+  };
+
+
+  useEffect(() => {
+    setCurrentConversation(conversation);
+    
+  }, [conversation]);
+
+  if (!currentConversation) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -30,8 +45,8 @@ export function ConversationView({ conversation, onContactSelect }: Conversation
 
   return (
     <div className="flex-1 flex flex-col bg-white">
-      <ConversationHeader 
-        conversation={conversation}
+      <ConversationHeader
+        conversation={currentConversation}
         onContactSelect={onContactSelect}
         onReply={() => setShowCompose(true)}
       />
@@ -40,21 +55,19 @@ export function ConversationView({ conversation, onContactSelect }: Conversation
         <nav className="flex space-x-8 px-6">
           <button
             onClick={() => setActiveTab('messages')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'messages'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'messages'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
           >
-            Messages ({conversation.messages.length})
+            Messages ({currentConversation.messages.length})
           </button>
           <button
             onClick={() => setActiveTab('internal')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'internal'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'internal'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
           >
             Internal Discussion
           </button>
@@ -65,23 +78,23 @@ export function ConversationView({ conversation, onContactSelect }: Conversation
         {activeTab === 'messages' ? (
           <div className="h-full flex flex-col">
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              {conversation.messages.map((message) => (
+              {currentConversation.messages.map((message) => (
                 <MessageBubble key={message.id} message={message} />
               ))}
             </div>
-            
+
             {showCompose && (
               <div className="border-t border-gray-200 p-4">
                 <ComposeMessage
-                  conversation={conversation}
-                  onSend={() => setShowCompose(false)}
+                  conversation={currentConversation}
+                  onSend={(emailData) => handleReply(emailData)}
                   onCancel={() => setShowCompose(false)}
                 />
               </div>
             )}
           </div>
         ) : (
-          <InternalDiscussion conversation={conversation} />
+          <InternalDiscussion conversation={currentConversation} />
         )}
       </div>
     </div>

@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth import get_user_model
+import json
 
 
 from ..models import TeamMember, Inbox, ChannelAccount, Tag, Message, Comment, Task, CalendarEvent, Conversation
@@ -19,6 +20,10 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from ..services.gmail_service import GmailService
+
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+from django_tenants.utils import  schema_context
 
 User = get_user_model()
 
@@ -113,49 +118,34 @@ class MessageViewSet(viewsets.ModelViewSet):
         subject = data.get('subject') or '(No Subject)'
 
         from_email = data.get("from_", {}).get("email")
-        to_emails = [p.get('email') for p in data.get('to', []) if p.get('email')]
-        cc_emails = [p.get('email') for p in data.get('cc', []) if p.get('email')]
-        bcc_emails = [p.get('email') for p in data.get('bcc', []) if p.get('email')]
+        tenant = getattr(request, "tenant", None)
+        tenant_schema = getattr(tenant, "schema_name", None)
+        print("DEBUG: tenant:", tenant, "schema:", tenant_schema)
 
-        plain_body = data.get('content')  # assuming plain text here
-        html_body = data.get('htmlContent')
-
-        print(f"DEBUG: Sender email from payload: {from_email}")
+        # Quick checks
+        print("DEBUG: incoming payload keys:", list(data.keys()))
+        print("DEBUG: thread_id, subject:", thread_id, subject)
+        print("DEBUG: from_email:", from_email)
 
         try:
             account = ChannelAccount.objects.get(email=from_email)
-            print(f"DEBUG: Found ChannelAccount: {account}, inbox id: {account.inbox.id}")
+            print(f"DEBUG: Found ChannelAccount: id={account.id}, inbox={getattr(account, 'inbox', None)}")
+            if getattr(account, "inbox", None):
+                print("DEBUG: account.inbox.id:", account.inbox.id)
         except ObjectDoesNotExist:
             print(f"ERROR: No ChannelAccount found for email: {from_email}")
             return Response({"error": "ChannelAccount not found for user"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Send email before saving
-        try:
-            self.send_email_smtp(
-                from_email=from_email,
-                to_email=to_emails,
-                subject=subject,
-                plain_body=plain_body,
-                html_body=html_body,
-                cc=cc_emails,
-                bcc=bcc_emails,
-                attachments=None  # add attachments handling if needed
-            )
-            print("DEBUG: Email sent successfully via SMTP")
-        except Exception as e:
-            print(f"ERROR: Failed to send email: {e}")
-            return Response({"error": f"Failed to send email: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        # Participants collection
+        # build participants
         participants = []
         seen = set()
         for p in [data.get('from_')] + data.get('to', []) + data.get('cc', []) + data.get('bcc', []):
             if p and p.get('email') not in seen:
                 participants.append(p)
                 seen.add(p['email'])
-        print(f"DEBUG: Participants collected: {participants}")
+        print("DEBUG: participants:", participants)
 
-        # Conversation get_or_create
+        # conversation get_or_create
         conversation, created = Conversation.objects.get_or_create(
             thread_id=thread_id,
             shared_inbox_id=account.inbox.id,
@@ -167,35 +157,104 @@ class MessageViewSet(viewsets.ModelViewSet):
                 'priority': data.get('priority', 'normal')
             }
         )
-        print(f"DEBUG: Conversation {'created' if created else 'retrieved'} with id: {conversation.id}")
+        print(f"DEBUG: conversation id={conversation.id}, created={created}")
 
         if not created:
             existing_emails = {p['email'] for p in conversation.participants}
             new_participants = [p for p in participants if p['email'] not in existing_emails]
             if new_participants:
                 conversation.participants.extend(new_participants)
-                print(f"DEBUG: Added new participants to conversation: {new_participants}")
+                conversation.save(update_fields=["participants"])
+                print("DEBUG: appended new participants:", new_participants)
 
+        # Serializer prep
         serializer = self.get_serializer(data=data)
-        serializer.is_valid(raise_exception=True)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except Exception as e:
+            print("ERROR: serializer.is_valid failed:", str(e))
+            print("DEBUG serializer errors:", serializer.errors)
+            return Response({"error": "Invalid payload", "details": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-        message = serializer.save(
-            conversation=conversation,
-            inbox=account.inbox
-        )
-        print(f"DEBUG: Message saved with id: {message.id}")
+        print("DEBUG: serializer.initial_data keys:", list(serializer.initial_data.keys()))
+        print("DEBUG: serializer.validated_data keys:", list(serializer.validated_data.keys()))
 
-        conversation.last_message = message
-        conversation.last_activity = timezone.now()
-        conversation.save()
+        # Try saving inside tenant schema
+        try:
+            with schema_context(tenant_schema) if tenant_schema else (lambda: (yield))():
+                try:
+                    print("DEBUG: about to call serializer.save(conversation=..., inbox=...)")
+                    message = serializer.save(conversation=conversation, inbox=account.inbox)
+                    print("DEBUG: serializer.save succeeded, message id:", getattr(message, "id", None))
+                except Exception as e_save:
+                    print("ERROR: serializer.save failed:", str(e_save))
+                    traceback.print_exc()
+                    vd = dict(serializer.validated_data)
+                    vd.pop('conversation', None)
+                    vd.pop('inbox', None)
+                    print("DEBUG: fallback creating TeamInboxMessage directly with vd keys:", list(vd.keys()))
+                    try:
+                        with transaction.atomic():
+                            message = TeamInboxMessage.objects.create(
+                                conversation=conversation,
+                                inbox=account.inbox,
+                                **vd
+                            )
+                            print("DEBUG: fallback create succeeded, message id:", message.id)
+                    except IntegrityError as ie:
+                        print("CRITICAL: fallback create IntegrityError:", str(ie))
+                        traceback.print_exc()
+                        try:
+                            print("DEBUG: last SQL queries (tail):", connection.queries[-5:])
+                        except Exception:
+                            pass
+                        return Response({"error": "db_integrity_error", "detail": str(ie)}, status=500)
+        except TypeError:
+            pass
 
-        message_data = MessageSerializer(message).data
-        conversation_data = ConversationSerializer(conversation).data
+        # update conversation pointers
+        try:
+            conversation.last_message = message
+            conversation.last_activity = timezone.now()
+            conversation.save(update_fields=["last_message", "last_activity"])
+        except Exception:
+            print("ERROR updating conversation pointers")
+            traceback.print_exc()
 
-        return Response(
-            {
-                "message": message_data,
-                "conversation": conversation_data
-            },
-            status=status.HTTP_201_CREATED
-        )
+        # --- Broadcast ---
+        try:
+            channel_layer = get_channel_layer()
+            group_name = f"tenant_{tenant.id}"
+
+            if created:
+                ws_payload = {
+                    'type': 'new_conversation',
+                    'message': {
+                        'type': 'new_conversation',
+                        'message': MessageSerializer(message).data,
+                        'conversation': ConversationSerializer(conversation).data
+                    }
+                }
+            else:
+                ws_payload = {
+                    'type': 'new_message',
+                    'message': {
+                        'type': 'new_message',
+                        'message': MessageSerializer(message).data,
+                        'conversation': ConversationSerializer(conversation).data
+                    }
+                }
+
+            print("📤 WebSocket payload:\n", json.dumps(ws_payload, indent=2))
+            async_to_sync(channel_layer.group_send)(group_name, ws_payload)
+            print(f"✅ Broadcasted to {group_name}")
+
+        except Exception:
+            print("WARN: broadcast failed")
+            traceback.print_exc()
+
+        # response
+        return Response({
+            "message": MessageSerializer(message).data,
+            "conversation": ConversationSerializer(conversation).data
+        }, status=status.HTTP_201_CREATED)

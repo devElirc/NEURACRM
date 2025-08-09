@@ -72,7 +72,6 @@ export function InboxView() {
         const data = JSON.parse(event.data);
         console.log('📩 New WebSocket message:', data);
 
-        // --- Handle new conversation ---
         if (data.type === 'new_conversation' && data.message?.conversation) {
           const conv = data.message.conversation;
 
@@ -83,31 +82,43 @@ export function InboxView() {
             toast.success(`🆕 New conversation: ${conv.subject}`, { duration: 5000 });
             return [conv, ...prev];
           });
+        } else if (data.type === 'new_message' && data.message) {
+          const msg = data.message;
 
-          // --- Handle new message ---
-        } else if (data.type === 'new_message' && data.message?.message && data.message?.conversation) {
-          const msg = data.message.message;
-          const conv = data.message.conversation;
+          // Update this conversation in the UI
+          setConversations(prev =>
+            prev.map(conv =>
+              conv.threadId === data.message.threadId
+                ? {
+                  ...conv,
+                  messages: [...conv.messages, data.message],
+                  lastMessage: data.message,
+                  lastActivity: new Date(data.message.timestamp),
+                  updatedAt: new Date(data.message.timestamp),
+                }
+                : conv
+            )
+          );
 
           setConversations((prev) => {
-            return prev.map((c) => {
-              if (c.id === conv.id) {
-                const alreadyExists = c.messages?.some((m) => m.id === msg.id);
-                if (alreadyExists) return c;
+            const updated = prev.map((conv) => {
+              if (conv.id === msg.conversationId) {
+                const alreadyExists = conv.messages?.some((m) => m.id === msg.id);
+                if (alreadyExists) return conv;
 
                 return {
-                  ...conv, // use updated conversation data
-                  messages: [...(c.messages || []), msg],
+                  ...conv,
+                  messages: [...(conv.messages || []), msg],
                   lastMessage: msg,
                   lastActivity: new Date(msg.timestamp),
                 };
               }
-              return c;
+              return conv;
             });
+
+            toast(`✉️ New message from ${msg.from?.email || 'someone'}`, { duration: 5000 });
+            return updated;
           });
-
-          toast(`✉️ New message from ${msg.from?.email || 'someone'}`, { duration: 5000 });
-
         } else {
           console.log('ℹ️ Unhandled message type:', data.type);
         }
@@ -122,8 +133,6 @@ export function InboxView() {
       hasConnected.current = false; // allow reconnect on tenant change
     };
   }, [tenant?.id]);
-
-
 
   useEffect(() => {
     if (!tenant?.id || !tokens) return;
@@ -215,31 +224,32 @@ export function InboxView() {
 
       console.log('Message + conversation from backend:', data);
 
-      // if (isNewConversation) {
-      //   // Backend should return the full conversation here
-      //   setConversations(prev => [data.conversation, ...prev]);
-      // } else {
-      //   // Append message to existing conversation
-      //   setConversations(prev =>
-      //     prev.map(conv =>
-      //       conv.threadId === threadId
-      //         ? {
-      //           ...conv,
-      //           messages: [...conv.messages, data.message],
-      //           lastMessage: data.message,
-      //           lastActivity: new Date(data.message.timestamp),
-      //           updatedAt: new Date(data.message.timestamp)
-      //         }
-      //         : conv
-      //     )
-      //   );
-      // }
+      if (isNewConversation) {
+        // Backend should return the full conversation here
+        setConversations(prev => [data.conversation, ...prev]);
+      } else {
+        // Append message to existing conversation
+        setConversations(prev =>
+          prev.map(conv =>
+            conv.threadId === threadId
+              ? {
+                ...conv,
+                messages: [...conv.messages, data.message],
+                lastMessage: data.message,
+                lastActivity: new Date(data.message.timestamp),
+                updatedAt: new Date(data.message.timestamp)
+              }
+              : conv
+          )
+        );
+      }
 
       setShowComposer(false);
     } catch (error) {
       console.error('Failed to send email:', error);
     }
   };
+
 
 
   const handleRefresh = async () => {
@@ -252,19 +262,19 @@ export function InboxView() {
   const handleReply = (data: any) => {
 
     // Update this conversation in the UI
-    // setConversations(prev =>
-    //   prev.map(conv =>
-    //     conv.threadId === data.message.threadId
-    //       ? {
-    //         ...conv,
-    //         messages: [...conv.messages, data.message],
-    //         lastMessage: data.message,
-    //         lastActivity: new Date(data.message.timestamp),
-    //         updatedAt: new Date(data.message.timestamp),
-    //       }
-    //       : conv
-    //   )
-    // );
+    setConversations(prev =>
+      prev.map(conv =>
+        conv.threadId === data.message.threadId
+          ? {
+            ...conv,
+            messages: [...conv.messages, data.message],
+            lastMessage: data.message,
+            lastActivity: new Date(data.message.timestamp),
+            updatedAt: new Date(data.message.timestamp),
+          }
+          : conv
+      )
+    );
   };
 
   const handleCreateSharedInbox = (inboxData: Partial<SharedInbox>) => {
