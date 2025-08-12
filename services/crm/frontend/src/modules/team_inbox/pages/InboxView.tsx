@@ -87,26 +87,10 @@ export function InboxView() {
           // --- Handle new message ---
         } else if (data.type === 'new_message' && data.message?.message && data.message?.conversation) {
           const msg = data.message.message;
-          const conv = data.message.conversation;
 
-          setConversations((prev) => {
-            return prev.map((c) => {
-              if (c.id === conv.id) {
-                const alreadyExists = c.messages?.some((m) => m.id === msg.id);
-                if (alreadyExists) return c;
+          handleReplys(data);
 
-                return {
-                  ...conv, // use updated conversation data
-                  messages: [...(c.messages || []), msg],
-                  lastMessage: msg,
-                  lastActivity: new Date(msg.timestamp),
-                };
-              }
-              return c;
-            });
-          });
-
-          toast(`✉️ New message from ${msg.from?.email || 'someone'}`, { duration: 5000 });
+          toast.success(`✉️ New message from ${msg.from?.email || 'someone'}`, { duration: 5000 });
 
         } else {
           console.log('ℹ️ Unhandled message type:', data.type);
@@ -179,7 +163,8 @@ export function InboxView() {
 
       const payload = {
         threadId,
-        from_: { email: user?.email || '', name: `${user?.full_name}` },
+        // from_: { email: user?.email || '', name: `${user?.full_name}` },
+        from_: { email: 'devhiroshi77@gmail.com', name: `${user?.full_name}` },
         to: emailData.to.map(email => ({ email, name: email.split('@')[0] })),
         cc: emailData.cc.map(email => ({ email, name: email.split('@')[0] })),
         bcc: emailData.bcc.map(email => ({ email, name: email.split('@')[0] })),
@@ -196,14 +181,13 @@ export function InboxView() {
         source: 'outgoing'
       };
 
-
       const res = await fetch('http://localhost:8000/api/inbox/messages/', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${tokens.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -214,26 +198,6 @@ export function InboxView() {
       const data = await res.json(); // Expecting backend to return { message, conversation }
 
       console.log('Message + conversation from backend:', data);
-
-      // if (isNewConversation) {
-      //   // Backend should return the full conversation here
-      //   setConversations(prev => [data.conversation, ...prev]);
-      // } else {
-      //   // Append message to existing conversation
-      //   setConversations(prev =>
-      //     prev.map(conv =>
-      //       conv.threadId === threadId
-      //         ? {
-      //           ...conv,
-      //           messages: [...conv.messages, data.message],
-      //           lastMessage: data.message,
-      //           lastActivity: new Date(data.message.timestamp),
-      //           updatedAt: new Date(data.message.timestamp)
-      //         }
-      //         : conv
-      //     )
-      //   );
-      // }
 
       setShowComposer(false);
     } catch (error) {
@@ -252,19 +216,39 @@ export function InboxView() {
   const handleReply = (data: any) => {
 
     // Update this conversation in the UI
-    // setConversations(prev =>
-    //   prev.map(conv =>
-    //     conv.threadId === data.message.threadId
-    //       ? {
-    //         ...conv,
-    //         messages: [...conv.messages, data.message],
-    //         lastMessage: data.message,
-    //         lastActivity: new Date(data.message.timestamp),
-    //         updatedAt: new Date(data.message.timestamp),
-    //       }
-    //       : conv
-    //   )
-    // );
+    setConversations(prev =>
+      prev.map(conv =>
+        conv.threadId === data.message.threadId
+          ? {
+            ...conv,
+            messages: [...conv.messages, data.message],
+            lastMessage: data.message,
+            lastActivity: new Date(data.message.timestamp),
+            updatedAt: new Date(data.message.timestamp),
+          }
+          : conv
+      )
+    );
+  };
+
+
+
+  const handleReplys = (data: any) => {
+
+    // Update this conversation in the UI
+    setConversations(prev =>
+      prev.map(conv =>
+        conv.threadId === data.message.threadId
+          ? {
+            ...conv,
+            messages: [...conv.messages, data.message],
+            lastMessage: data.message,
+            lastActivity: new Date(data.message.timestamp),
+            updatedAt: new Date(data.message.timestamp),
+          }
+          : conv
+      )
+    );
   };
 
   const handleCreateSharedInbox = (inboxData: Partial<SharedInbox>) => {

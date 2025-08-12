@@ -19,11 +19,13 @@ export function ComposeMessage({ conversation, onSend, onCancel }: ComposeMessag
   const [bcc, setBcc] = useState('');
   const [showCcBcc, setShowCcBcc] = useState(false);
   const { user, tokens, tenant } = useAuth();
+  const [isSending, setIsSending] = useState(false);
 
 
 
   const handleSend = async () => {
     if (!message.trim()) return;
+    setIsSending(true);
 
     try {
       const threadId = conversation.threadId; // reply stays in same thread
@@ -80,8 +82,12 @@ export function ComposeMessage({ conversation, onSend, onCancel }: ComposeMessag
       // Clear the input and close composer
       setMessage('');
       onSend(data);
+
     } catch (error) {
       console.error('Failed to send reply:', error);
+    }
+    finally {
+      setIsSending(false);
     }
   };
 
@@ -182,8 +188,12 @@ export function ComposeMessage({ conversation, onSend, onCancel }: ComposeMessag
             disabled={!message.trim()}
             className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            <Send className="h-4 w-4 mr-2" />
-            Send
+            {isSending ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+            ) : (
+              <Send className="h-4 w-4 mr-2" />
+            )}
+            {isSending ? 'Sending...' : 'Send'}
           </button>
         </div>
       </div>

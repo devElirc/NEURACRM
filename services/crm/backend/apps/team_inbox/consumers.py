@@ -70,8 +70,6 @@ class InboxConsumer(AsyncWebsocketConsumer):
         }))
 
     async def new_conversation(self, event):
-        print(f"📥 WebSocket new_conversation: {event}")
-
         await self.send(text_data=json.dumps({
             "type": "new_conversation",
             "message": {
@@ -80,8 +78,6 @@ class InboxConsumer(AsyncWebsocketConsumer):
         }))
 
     async def new_message(self, event):
-        print(f"📥 WebSocket new_message: {event}")
-
         await self.send(text_data=json.dumps({
             "type": "new_message",
             "message": event["message"]

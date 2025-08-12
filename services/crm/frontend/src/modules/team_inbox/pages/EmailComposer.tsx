@@ -52,23 +52,23 @@ export function EmailComposer({
   threadId
 }: EmailComposerProps) {
   const { user } = useAuth();
-  // const [formData, setFormData] = useState({
-  //   to: to,
-  //   cc: '',
-  //   bcc: '',
-  //   subject: isReply && !subject.startsWith('Re:') ? `Re: ${subject}` : subject,
-  //   content: '',
-  //   htmlContent: ''
-  // });
-
   const [formData, setFormData] = useState({
-    to: to || 'develirc@gmail.com',
+    to: to,
     cc: '',
     bcc: '',
-    subject: isReply && !subject.startsWith('Re:') ? `Re: ${subject}` : (subject || 'Test Subject'),
-    content: 'Hello,\n\nThis is a default message.',
-    htmlContent: '<p>Hello,<br><br>This is a default message.</p>'
+    subject: isReply && !subject.startsWith('Re:') ? `Re: ${subject}` : subject,
+    content: '',
+    htmlContent: ''
   });
+
+  // const [formData, setFormData] = useState({
+  //   to: to || 'develirc@gmail.com',
+  //   cc: '',
+  //   bcc: '',
+  //   subject: isReply && !subject.startsWith('Re:') ? `Re: ${subject}` : (subject || 'Test Subject'),
+  //   content: 'Hello,\n\nThis is a default message.',
+  //   htmlContent: '<p>Hello,<br><br>This is a default message.</p>'
+  // });
 
   const [showCcBcc, setShowCcBcc] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);

@@ -54,7 +54,7 @@ class GmailService:
                 history = self.service.users().history().list(
                     userId='me',
                     startHistoryId=history_id,
-                    # historyTypes=['messageAdded'],
+                    historyTypes=['messageAdded'],
                     pageToken=page_token
                 ).execute()
 
