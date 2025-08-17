@@ -23,6 +23,7 @@ interface ChannelsTabProps {
 export function ChannelsTab({ inbox }: ChannelsTabProps) {
   const [showAddChannelForm, setShowAddChannelForm] = useState(false);
   const [channels, setChannels] = useState<EmailChannel[]>(inbox.channels);
+  console.log("channels--", channels);
 
   const handleAddChannel = (channelData: EmailChannelFormData) => {
     console.log("🔍 Handling channel addition:", channelData);

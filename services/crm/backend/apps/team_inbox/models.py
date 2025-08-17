@@ -22,31 +22,76 @@ class TeamMember(models.Model):
         return f"{self.user.email} ({self.role})"
 
 
+# class Inbox(models.Model):
+#     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+#     name = models.CharField(max_length=100)
+#     email = models.EmailField(unique=True)
+#     created_at = models.DateTimeField(auto_now_add=True)
+
+#     def __str__(self):
+#         return f"{self.name} ({self.email})"
+
+
+# class ChannelAccount(models.Model):
+#     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+#     email = models.EmailField(unique=True)
+#     provider = models.CharField(max_length=50, default="gmail")
+#     access_token = models.TextField()
+#     refresh_token = models.TextField()
+#     expires_in = models.IntegerField()  # seconds until token expires
+#     token_acquired_at = models.DateTimeField(default=timezone.now)
+#     inbox = models.ForeignKey(Inbox, on_delete=models.CASCADE, related_name='channels')
+#     last_history_id = models.CharField(max_length=255, null=True, blank=True)
+
+#     def __str__(self):
+#         return f"{self.email} ({self.provider})"
+
+#     def is_token_expired(self):
+#         expiry_time = self.token_acquired_at + timezone.timedelta(seconds=self.expires_in)
+#         return timezone.now() >= expiry_time
+
 class Inbox(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
     name = models.CharField(max_length=100)
-    email = models.EmailField(unique=True)
+    description = models.TextField(null=True, blank=True)  # optional field
+    
+    # removed email, since "channels" will carry identifiers now
+    
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)  # ✅ frontend expects updatedAt
 
     def __str__(self):
-        return f"{self.name} ({self.email})"
+        return f"{self.name}"
 
 
 class ChannelAccount(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    email = models.EmailField(unique=True)
-    provider = models.CharField(max_length=50, default="gmail")
+    
+    # Generic identifier: could be an email, phone number, or account ID
+    identifier = models.CharField(max_length=255, unique=True, null=True, blank=True)
+
+    provider = models.CharField(max_length=50, default="gmail")  # e.g. gmail, outlook, whatsapp, slack
+    
     access_token = models.TextField()
-    refresh_token = models.TextField()
-    expires_in = models.IntegerField()  # seconds until token expires
+    refresh_token = models.TextField(null=True, blank=True)  # not all providers support refresh
+    expires_in = models.IntegerField(null=True, blank=True)   # seconds until token expires
     token_acquired_at = models.DateTimeField(default=timezone.now)
-    inbox = models.ForeignKey(Inbox, on_delete=models.CASCADE, related_name='channels')
+    
+    inbox = models.ForeignKey(
+        "Inbox", 
+        on_delete=models.CASCADE, 
+        related_name="channels"
+    )
+    
     last_history_id = models.CharField(max_length=255, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.email} ({self.provider})"
+        return f"{self.identifier} ({self.provider})"
 
     def is_token_expired(self):
+        if not self.expires_in:
+            return False  # no expiry set (some providers issue non-expiring tokens)
         expiry_time = self.token_acquired_at + timezone.timedelta(seconds=self.expires_in)
         return timezone.now() >= expiry_time
 

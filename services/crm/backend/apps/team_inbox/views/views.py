@@ -13,10 +13,11 @@ from django.contrib.auth import get_user_model
 from django.core.serializers.json import DjangoJSONEncoder
 from django_tenants.utils import schema_context
 
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, status
 from rest_framework.permissions import AllowAny
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
+
 
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -88,7 +89,7 @@ def gmail_notify(request):
             return JsonResponse({"status": "duplicate_skipped"})
         cache.set(cache_key, True, timeout=10)
 
-        account = ChannelAccount.objects.get(email=email)
+        account = ChannelAccount.objects.get(identifier=email)
         tenant = get_tenant_for_email(email)
         if not tenant:
             return JsonResponse({"error": "Tenant not found for this email"}, status=404)
@@ -129,7 +130,7 @@ def gmail_notify(request):
                     thread_id=thread_id,
                     defaults={
                         "subject": subject or "(No Subject)",
-                        "channel": "email",
+                        "channel": account.provider,
                         "priority": "normal",
                         "status": "open",
                         "last_activity": timestamp,
@@ -239,10 +240,28 @@ class TeamMemberViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
 
+# class InboxViewSet(viewsets.ModelViewSet):
+#     queryset = Inbox.objects.all()
+#     serializer_class = InboxSerializer
+#     permission_classes = [permissions.IsAuthenticated]
+
 class InboxViewSet(viewsets.ModelViewSet):
     queryset = Inbox.objects.all()
     serializer_class = InboxSerializer
-    permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=False, methods=['get', 'post'], url_path='sharedinbox')
+    def shared_inbox(self, request):
+        if request.method == 'GET':
+            inboxes = self.get_queryset().prefetch_related("channels")
+            serializer = self.get_serializer(inboxes, many=True)
+            return Response(serializer.data)
+
+        elif request.method == 'POST':
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
 
 
 class ChannelAccountViewSet(viewsets.ModelViewSet):

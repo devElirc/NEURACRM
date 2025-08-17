@@ -5,62 +5,58 @@ import { Button } from '../../pages/ui/Button';
 import { CreateInboxForm } from './CreateInboxForm';
 import { InboxDetailsView } from './InboxDetailsView';
 import { InboxCard } from './InboxCard';
+import { mockSharedInboxes } from '../../data/mockData';
 import { useAuth } from '../../../../auth/AuthProvider';
 
 interface SharedInboxManagerProps {
   onClose: () => void;
   onCreateInbox?: (inbox: Partial<SharedInbox>) => void;
-  sharedInboxes: SharedInbox[];
 }
 
-export function SharedInboxManager({ onClose, onCreateInbox, sharedInboxes }: SharedInboxManagerProps) {
-  // ✅ rename local state to avoid clashing with props
-  const [inboxList, setInboxList] = useState<SharedInbox[]>(sharedInboxes);
+export function SharedInboxManager({ onClose, onCreateInbox }: SharedInboxManagerProps) {
+  const [sharedInboxes, setSharedInboxes] = useState<SharedInbox[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedInbox, setSelectedInbox] = useState<SharedInbox | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const { user, tokens, tenant } = useAuth();
 
-  // 🔄 keep inboxList in sync with parent prop if it changes
+
+
   useEffect(() => {
-    setInboxList(sharedInboxes);
-    console.log("sharedInboxes", sharedInboxes);
-  }, [sharedInboxes]);
+    if (!tenant?.id || !tokens) return;
 
-  // useEffect(() => {
-  //   if (!tenant?.id || !tokens) return;
+    const fetchInboxes = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`http://localhost:8000/api/inbox/inboxes/sharedinbox/`, {
+          headers: {
+            Authorization: `Bearer ${tokens.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        });
 
-  //   const fetchInboxes = async () => {
-  //     setLoading(true);
-  //     try {
-  //       const res = await fetch(`http://localhost:8000/api/inbox/inboxes/sharedinbox/`, {
-  //         headers: {
-  //           Authorization: `Bearer ${tokens.access_token}`,
-  //           'Content-Type': 'application/json',
-  //         },
-  //       });
+        if (!res.ok) throw new Error('Failed to fetch inboxes');
+        const data = await res.json();
 
-  //       if (!res.ok) throw new Error('Failed to fetch inboxes');
-  //       const data = await res.json();
+        // Convert string dates to Date objects if needed
+        const inboxes: SharedInbox[] = data.map((inbox: any) => ({
+          ...inbox,
+          createdAt: new Date(inbox.createdAt),
+          updatedAt: new Date(inbox.updatedAt),
+        }));
 
-  //       // Convert string dates to Date objects
-  //       const inboxes: SharedInbox[] = data.map((inbox: any) => ({
-  //         ...inbox,
-  //         createdAt: new Date(inbox.createdAt),
-  //         updatedAt: new Date(inbox.updatedAt),
-  //       }));
+        setSharedInboxes(inboxes);
+      } catch (err) {
+        console.error('❌ Failed to fetch inboxes', err);
+        setSharedInboxes([]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  //       setInboxList(inboxes);
-  //     } catch (err) {
-  //       console.error('❌ Failed to fetch inboxes', err);
-  //       setInboxList([]);
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
+    fetchInboxes();
+  }, [tenant, tokens]);
 
-  //   fetchInboxes();
-  // }, [tenant, tokens]);
 
   const handleCreateInbox = async (inboxData: Partial<SharedInbox>) => {
     if (!tenant?.id || !tokens) return;
@@ -69,11 +65,11 @@ export function SharedInboxManager({ onClose, onCreateInbox, sharedInboxes }: Sh
       const payload = {
         name: inboxData.name,
         description: inboxData.description,
-        channels: inboxData.channels, // optional
+        channels: inboxData.channels, // optional array of identifiers
         tenantId: tenant.id,          // if backend requires tenant context
       };
 
-      const response = await fetch('http://localhost:8000/api/inbox/inboxes/sharedinbox/', {
+      const response = await fetch('http://localhost:8000/api/inbox/inboxes/sharedinbox/', {  // note plural 'inboxes' to match router
         method: 'POST',
         headers: {
           Authorization: `Bearer ${tokens.access_token}`,
@@ -83,12 +79,13 @@ export function SharedInboxManager({ onClose, onCreateInbox, sharedInboxes }: Sh
       });
 
       if (!response.ok) throw new Error('Failed to create inbox');
-      const data = await response.json();
+
+      const data = await response.json();  // parse JSON
 
       const newInbox: SharedInbox = {
         ...data,
-        members: inboxData.members || [],
-        createdBy: user?.id || '1',
+        members: inboxData.members || [],  // front-end only
+        createdBy: user?.id || '1',        // from user context
         settings: inboxData.settings || {
           autoAssignment: false,
           notifications: {
@@ -101,14 +98,16 @@ export function SharedInboxManager({ onClose, onCreateInbox, sharedInboxes }: Sh
         },
       };
 
-      setInboxList(prev => [...prev, newInbox]);
+      setSharedInboxes(prev => [...prev, newInbox]);
       setShowCreateForm(false);
       onCreateInbox?.(newInbox);
 
     } catch (err) {
       console.error('❌ Failed to create inbox', err);
+      // optional: show toast notification to user
     }
   };
+
 
   if (showCreateForm) {
     return <CreateInboxForm onSubmit={handleCreateInbox} onCancel={() => setShowCreateForm(false)} />;
@@ -147,7 +146,7 @@ export function SharedInboxManager({ onClose, onCreateInbox, sharedInboxes }: Sh
       <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
         {loading ? (
           <p>Loading inboxes...</p>
-        ) : inboxList.length === 0 ? (
+        ) : sharedInboxes.length === 0 ? (
           <div className="text-center py-12">
             <Users className="w-16 h-16 mx-auto text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
@@ -163,7 +162,7 @@ export function SharedInboxManager({ onClose, onCreateInbox, sharedInboxes }: Sh
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {inboxList.map((inbox) => (
+            {sharedInboxes.map((inbox) => (
               <InboxCard
                 key={inbox.id}
                 inbox={inbox}
@@ -173,6 +172,7 @@ export function SharedInboxManager({ onClose, onCreateInbox, sharedInboxes }: Sh
           </div>
         )}
       </div>
+
     </div>
   );
 }

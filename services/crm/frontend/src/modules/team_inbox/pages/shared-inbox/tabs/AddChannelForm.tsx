@@ -30,8 +30,9 @@ const OAUTH_CONFIG: Record<Exclude<ProviderType, "custom">, any> = {
     callbackPath: "/google-callback.html",
   },
   outlook: {
-    clientId: "YOUR_OUTLOOK_CLIENT_ID",
-    scope: "https://graph.microsoft.com/Mail.Read User.Read",
+    clientId: "b405158e-cfe4-49a5-a294-d259d400ef27",
+    scope:
+      "openid offline_access https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/Mail.Send User.Read",
     authUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
     callbackPath: "/outlook-callback.html",
   },
@@ -49,8 +50,8 @@ const ProviderSelector: React.FC<{
         type="button"
         onClick={() => onSelect(id)}
         className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${selected === id
-          ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
-          : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+            ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+            : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
           }`}
       >
         <Globe className="w-4 h-4 inline-block mr-2" />
@@ -91,10 +92,7 @@ const CustomProviderFields: React.FC<{
   </div>
 );
 
-export default function AddChannelForm({
-  onSubmit,
-  onCancel,
-}: AddChannelFormProps) {
+export default function AddChannelForm({ onSubmit, onCancel }: AddChannelFormProps) {
   const [formData, setFormData] = useState<EmailChannelFormData>({
     provider: "gmail",
     email: "",
@@ -105,24 +103,22 @@ export default function AddChannelForm({
 
   /** OAuth postMessage listener */
   useEffect(() => {
-    
     const handleMessage = async (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
 
       const { status, email } = event.data || {};
       if (!status) return;
 
-      if (status === "google_connected") {
+      if (status.endsWith("_connected")) {
         setConnectionStatus("Connected successfully!");
         setFormData((prev) => ({ ...prev, email }));
 
-        // ✅ Now we can use await
         try {
           onSubmit({ provider: formData.provider, email });
         } catch (err) {
           setConnectionStatus("Team Inbox creation failed.");
         }
-      } else if (status === "google_failed") {
+      } else if (status.endsWith("_failed")) {
         setConnectionStatus("Connection failed.");
       }
 
@@ -133,73 +129,46 @@ export default function AddChannelForm({
     return () => window.removeEventListener("message", handleMessage);
   }, [formData.provider, onSubmit]);
 
+  /** OAuth popup handler */
+  const handleOAuthConnect = useCallback(() => {
+    const inboxName = JSON.parse(localStorage.getItem("selected_inbox_name") || '""');
+    const inboxId = JSON.parse(localStorage.getItem("selected_inbox_id") || '""');
 
-  /** Handle OAuth flow */
-  // const handleOAuthConnect = useCallback(() => {
+    const config = OAUTH_CONFIG[formData.provider as Exclude<ProviderType, "custom">];
+    if (!config) return;
 
-    
-  //   const inboxName = JSON.parse(localStorage.getItem("selected_inbox_name") || '""');
-  // const inboxId = JSON.parse(localStorage.getItem("selected_inbox_id") || '""');
-  //   const config = OAUTH_CONFIG[formData.provider as Exclude<ProviderType, "custom">];
-  //   if (!config) return;
+    setConnectionStatus("Connecting...");
+    setFormData((prev) => ({ ...prev, email: "" }));
 
+    const redirectUri = `${window.location.origin}${config.callbackPath}`;
 
+    const stateObj = { provider: formData.provider, inboxName, inboxId };
 
-  //   setConnectionStatus("Connecting...");
-  //   setFormData((prev) => ({ ...prev, email: "" }));
-
-  //   const redirectUri = `${window.location.origin}${config.callbackPath}`;
-  //   const url =
-  //     `${config.authUrl}?` +
-  //     new URLSearchParams({
-  //       client_id: config.clientId,
-  //       redirect_uri: redirectUri,
-  //       response_type: "code",
-  //       scope: config.scope,
-  //       access_type: "offline",
-  //       prompt: "consent",
-  //       state: formData.provider,
-  //     }).toString();
-
-  //   popupRef.current = window.open(url, "oauthPopup", "width=600,height=700");
-  //   if (!popupRef.current) setConnectionStatus("Popup blocked. Please allow popups.");
-  // }, [formData.provider]);
-
-const handleOAuthConnect = useCallback(() => {
-  const inboxName = JSON.parse(localStorage.getItem("selected_inbox_name") || '""');
-  const inboxId = JSON.parse(localStorage.getItem("selected_inbox_id") || '""');
-
-  const config = OAUTH_CONFIG[formData.provider as Exclude<ProviderType, "custom">];
-  if (!config) return;
-
-  setConnectionStatus("Connecting...");
-  setFormData((prev) => ({ ...prev, email: "" }));
-
-  const redirectUri = `${window.location.origin}${config.callbackPath}`;
-
-  // Create a JSON string containing provider + inbox info
-  const stateObj = {
-    provider: formData.provider,
-    inboxName,
-    inboxId,
-  };
-
-  const url =
-    `${config.authUrl}?` +
-    new URLSearchParams({
+    const params: Record<string, string> = {
       client_id: config.clientId,
       redirect_uri: redirectUri,
       response_type: "code",
       scope: config.scope,
-      access_type: "offline",
-      prompt: "consent",
-      state: encodeURIComponent(JSON.stringify(stateObj)),  // encode JSON string as URI component
-    }).toString();
+      state: encodeURIComponent(JSON.stringify(stateObj)),
+    };
 
-  popupRef.current = window.open(url, "oauthPopup", "width=600,height=700");
-  if (!popupRef.current) setConnectionStatus("Popup blocked. Please allow popups.");
-}, [formData.provider]);
+    // Google-only
+    if (formData.provider === "gmail") {
+      params.access_type = "offline";
+      params.prompt = "consent";
+    }
 
+    // Outlook-only
+    if (formData.provider === "outlook") {
+      params.response_mode = "query";
+      params.prompt = "consent";
+    }
+
+    const url = `${config.authUrl}?${new URLSearchParams(params).toString()}`;
+
+    popupRef.current = window.open(url, "oauthPopup", "width=600,height=700");
+    if (!popupRef.current) setConnectionStatus("Popup blocked. Please allow popups.");
+  }, [formData.provider]);
 
 
   /** Handle Custom (IMAP/SMTP) submission */

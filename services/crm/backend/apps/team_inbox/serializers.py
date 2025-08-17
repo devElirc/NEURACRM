@@ -14,26 +14,71 @@ class TeamMemberSerializer(serializers.ModelSerializer):
         model = TeamMember
         fields = ['id', 'user', 'role', 'is_active']
 
-class InboxSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Inbox
-        fields = ['id', 'name', 'email', 'created_at']
+# class InboxSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = Inbox
+#         fields = ['id', 'name', 'email', 'created_at']
+
+# class ChannelAccountSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = ChannelAccount
+#         fields = [
+#             'id',
+#             'email',
+#             'provider',
+#             'access_token',
+#             'refresh_token',
+#             'expires_in',
+#             'token_acquired_at',
+#             'inbox',
+#             'last_history_id',
+#         ]
+#         read_only_fields = ['id', 'token_acquired_at']
 
 class ChannelAccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChannelAccount
         fields = [
-            'id',
-            'email',
-            'provider',
-            'access_token',
-            'refresh_token',
-            'expires_in',
-            'token_acquired_at',
-            'inbox',
-            'last_history_id',
+            "id",
+            "identifier",
+            "provider",
+            "access_token",
+            "refresh_token",
+            "expires_in",
+            "token_acquired_at",
+            "last_history_id",
         ]
-        read_only_fields = ['id', 'token_acquired_at']
+
+
+class InboxSerializer(serializers.ModelSerializer):
+    channels = ChannelAccountSerializer(many=True, read_only=True)  # reverse relation
+    createdAt = serializers.DateTimeField(source="created_at", read_only=True)
+    updatedAt = serializers.DateTimeField(source="updated_at", read_only=True)
+
+    class Meta:
+        model = Inbox
+        fields = [
+            "id",
+            "name",
+            "description",
+            "channels",
+            "createdAt",
+            "updatedAt",
+        ]
+
+    def create(self, validated_data):
+        channels_data = validated_data.pop("channels", [])
+        inbox = Inbox.objects.create(**validated_data)
+        
+        for channel in channels_data:
+            # create a ChannelAccount linked to this inbox
+            ChannelAccount.objects.create(
+                inbox=inbox,
+                identifier=channel.get("identifier"),
+                provider=channel.get("provider", "email")  # default provider
+            )
+        return inbox
+
 
 class CommentSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
@@ -85,71 +130,6 @@ class TagSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
         fields = ['id', 'name', 'color']
-
-
-
-# class MessageSerializer(serializers.ModelSerializer):
-#     from_ = EmailAddressSerializer(source='from_email')
-#     to = EmailAddressSerializer(many=True)
-#     cc = EmailAddressSerializer(many=True, required=False, allow_null=True)
-#     bcc = EmailAddressSerializer(many=True, required=False, allow_null=True)
-#     replyTo = serializers.SerializerMethodField()
-#     threadId = serializers.CharField(source='thread_id', allow_null=True)
-#     messageId = serializers.CharField(source='message_id')
-#     inReplyTo = serializers.CharField(source='in_reply_to', required=False, allow_null=True)
-#     references = serializers.ListField(child=serializers.CharField(), allow_null=True)
-#     htmlContent = serializers.CharField(source='html_content', required=False, allow_null=True)
-#     isRead = serializers.BooleanField(source='is_read')
-#     isStarred = serializers.BooleanField(source='is_starred')
-#     isDraft = serializers.BooleanField(source='is_draft')
-#     attachments = AttachmentSerializer(many=True, read_only=True)
-#     internalNotes = InternalNoteSerializer(many=True, source='internal_notes', read_only=True)
-#     labels = LabelSerializer(many=True, read_only=True)
-#     priority = serializers.ChoiceField(choices=Message.PRIORITY_CHOICES)
-#     source = serializers.ChoiceField(choices=Message.SOURCE_CHOICES)
-
-#     class Meta:
-#         model = Message
-#         fields = [
-#             'id',
-#             'threadId',
-#             'from_',
-#             'to',
-#             'cc',
-#             'bcc',
-#             'replyTo',
-#             'subject',
-#             'content',
-#             'htmlContent',
-#             'timestamp',
-#             'isRead',
-#             'isStarred',
-#             'isDraft',
-#             'messageId',
-#             'inReplyTo',
-#             'references',
-#             'attachments',
-#             'internalNotes',
-#             'labels',
-#             'priority',
-#             'source',
-#         ]
-
-#     def get_replyTo(self, obj):
-#         reply_to = obj.reply_to
-#         if not reply_to:
-#             return None
-#         if isinstance(reply_to, list):
-#             return reply_to[0] if reply_to else None
-#         if isinstance(reply_to, dict):
-#             return reply_to
-#         return None
-
-#     def to_representation(self, instance):
-#         data = super().to_representation(instance)
-#         data['from'] = data.pop('from_')
-#         return data\
-
 
 
 class MessageSerializer(serializers.ModelSerializer):

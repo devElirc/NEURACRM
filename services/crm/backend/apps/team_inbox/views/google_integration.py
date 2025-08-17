@@ -30,9 +30,9 @@ from django_tenants.utils import  schema_context
 def google_callback(request):
     try:
         data = json.loads(request.body)
-        code, inbox_name = data.get("code"), data.get("inbox_name")
-        if not code or not inbox_name:
-            return JsonResponse({"error": "Missing code or inbox_name"}, status=400)
+        code, inboxName = data.get("code"), data.get("inboxName")
+        if not code or not inboxName:
+            return JsonResponse({"error": "Missing code or inboxName"}, status=400)
 
         # Exchange code for tokens
         token_data = exchange_code_for_token(code)
@@ -40,8 +40,8 @@ def google_callback(request):
         refresh_token = token_data["refresh_token"]
 
         # Get user email from Google
-        email = get_google_user_email(access_token)
-        print("✅ Found Google email:", email)
+        identifier = get_google_user_email(access_token)
+        print("✅ Found Google identifier:", identifier)
 
         # Get current tenant from request (based on subdomain)
         tenant = request.tenant
@@ -52,14 +52,16 @@ def google_callback(request):
             # Ensure email mapping is created in the public schema
             with schema_context("public"):
                 TenantEmailMapping.objects.update_or_create(
-                    email=email, defaults={"tenant": tenant}
+                    email=identifier, defaults={"tenant": tenant}  # mapping email -> tenant
                 )
                 print("✅ Email mapping created in public schema")
 
             # Now do tenant-specific operations
-            inbox, _ = Inbox.objects.get_or_create(email=email, defaults={"name": inbox_name})
+            inbox, _ = Inbox.objects.get_or_create(
+                name=inboxName
+            )
             channel_account, _ = ChannelAccount.objects.update_or_create(
-                email=email,
+                identifier=identifier,
                 defaults=dict(
                     provider="gmail",
                     access_token=access_token,
@@ -76,7 +78,7 @@ def google_callback(request):
                 channel_account.last_history_id = watch_response["historyId"]
                 channel_account.save()
 
-            return JsonResponse({"email": email, "inbox_id": str(inbox.id)})
+            return JsonResponse({"email": identifier, "inbox_id": str(inbox.id)})
 
     except Exception as e:
         print("❌ Error in google_callback:", e)

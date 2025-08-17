@@ -47,9 +47,9 @@ export function InboxCard({ inbox, onSelect }: InboxCardProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
             <Users className="w-4 h-4 mr-2" />
-            {inbox.members.length} member{inbox.members.length !== 1 ? 's' : ''}
+            {/* {inbox.members.length} member{inbox.members.length !== 1 ? 's' : ''} */}
           </div>
-          <div className="flex -space-x-2">
+          {/* <div className="flex -space-x-2">
             {inbox.members.slice(0, 3).map((member) => (
               <div
                 key={member.id}
@@ -76,7 +76,7 @@ export function InboxCard({ inbox, onSelect }: InboxCardProps) {
                 </span>
               </div>
             )}
-          </div>
+          </div> */}
         </div>
 
         <div className="flex items-center justify-between">
@@ -107,7 +107,10 @@ export function InboxCard({ inbox, onSelect }: InboxCardProps) {
 
       <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-          <span>Created {inbox.createdAt.toLocaleDateString()}</span>
+          <span>
+            Created {inbox.createdAt ? new Date(inbox.createdAt).toLocaleDateString() : "—"}
+          </span>
+
           <Button size="sm" variant="ghost">
             <Eye className="w-3 h-3 mr-1" />
             View

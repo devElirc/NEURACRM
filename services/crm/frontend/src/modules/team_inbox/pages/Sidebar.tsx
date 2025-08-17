@@ -186,8 +186,8 @@ export function Sidebar({ activeFilter, onFilterChange, currentView, onCreateInb
             {sharedInboxes.map((inbox) => (
               <button
                 key={inbox.id}
-                onClick={() => onFilterChange(`inbox-${inbox.id}`)}
-                className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${activeFilter === `inbox-${inbox.id}`
+                onClick={() => onFilterChange(`${inbox.name}`)}
+                className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${activeFilter === `${inbox.name}`
                     ? 'bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                     : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
                   }`}

@@ -36,6 +36,7 @@ export function InboxView() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [sharedInboxes, setSharedInboxes] = useState<SharedInbox[]>(mockSharedInboxes);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const ws = useRef<WebSocket | null>(null);
   const hasConnected = useRef(false);
@@ -135,6 +136,45 @@ export function InboxView() {
 
     fetchConversations();
   }, [tenant, tokens]);
+
+
+
+  useEffect(() => {
+    if (!tenant?.id || !tokens) return;
+
+    const fetchInboxes = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`http://localhost:8000/api/inbox/inboxes/sharedinbox/`, {
+          headers: {
+            Authorization: `Bearer ${tokens.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!res.ok) throw new Error('Failed to fetch inboxes');
+        const data = await res.json();
+
+        // Convert string dates to Date objects if needed
+        const inboxes: SharedInbox[] = data.map((inbox: any) => ({
+          ...inbox,
+          createdAt: new Date(inbox.createdAt),
+          updatedAt: new Date(inbox.updatedAt),
+        }));
+
+        setSharedInboxes(inboxes);
+      } catch (err) {
+        console.error('❌ Failed to fetch inboxes', err);
+        setSharedInboxes([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInboxes();
+  }, [tenant, tokens]);
+
+
 
   const filteredConversations = useMemo(() => {
     return conversations.filter((conv) => {
@@ -361,6 +401,7 @@ export function InboxView() {
           <SharedInboxManager
             onClose={() => setShowSharedInboxManager(false)}
             onCreateInbox={handleCreateSharedInbox}
+            sharedInboxes = {sharedInboxes}
           />
         </div>
       )}

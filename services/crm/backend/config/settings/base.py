@@ -334,3 +334,20 @@ GOOGLE_REDIRECT_URI = os.getenv(
     "http://localhost:8000/api/inbox/auth/google/callback"
 )
 
+# Outlook OAuth Settings
+OUTLOOK_CLIENT_ID = os.getenv(
+    "OUTLOOK_CLIENT_ID",
+    "b405158e-cfe4-49a5-a294-d259d400ef27"
+)
+OUTLOOK_CLIENT_SECRET = os.getenv(
+    "OUTLOOK_CLIENT_SECRET",
+    "5JZ8Q~_qLVEIAl_4oPHxZWq.BLughlHoqU4dfc.D"
+)
+OUTLOOK_REDIRECT_URI = os.getenv(
+    "OUTLOOK_REDIRECT_URI",
+    # "http://localhost:8000/api/inbox/auth/outlook/callback"
+    "http://localhost:3000/outlook-callback.html"
+
+)
+
+

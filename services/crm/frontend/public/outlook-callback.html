@@ -1,22 +1,20 @@
-<!-- google-callback.html -->
+<!-- outlook-callback.html -->
 <!DOCTYPE html>
 <html>
-
 <head>
-  <title>Google OAuth Callback</title>
+  <title>Outlook OAuth Callback</title>
 </head>
-
 <body>
 <script>
   (async function () {
-    console.log("🟡 Callback page loaded");
+    console.log("🟡 Outlook Callback page loaded");
 
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     const rawState = params.get("state");
 
     if (!code) {
-      window.opener?.postMessage({ status: "google_failed" }, "*");
+      window.opener?.postMessage({ status: "outlook_failed" }, "*");
       window.close();
       return;
     }
@@ -35,32 +33,33 @@
     }
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/inbox/auth/google/callback", {
+      const response = await fetch("http://127.0.0.1:8000/api/inbox/auth/outlook/callback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, inboxName }),
+        body: JSON.stringify({ code, inboxName, inboxId }),
       });
 
       const result = await response.json();
 
       if (response.ok) {
+        console.log("✅ Token exchange success:", result);
         window.opener?.postMessage({
-          status: "google_connected",
+          status: "outlook_connected",
           email: result.email,
+          inboxName,
+          inboxId
         }, "*");
       } else {
-        console.error("Exchange failed:", result);
-        window.opener?.postMessage({ status: "google_failed" }, "*");
+        console.error("❌ Exchange failed:", result);
+        window.opener?.postMessage({ status: "outlook_failed" }, "*");
       }
     } catch (err) {
-      console.error("Network error:", err);
-      window.opener?.postMessage({ status: "google_failed" }, "*");
+      console.error("❌ Network error:", err);
+      window.opener?.postMessage({ status: "outlook_failed" }, "*");
     }
 
     window.close();
   })();
 </script>
-
 </body>
-
 </html>

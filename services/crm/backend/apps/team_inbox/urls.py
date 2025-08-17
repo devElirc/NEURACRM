@@ -4,6 +4,7 @@ from .views.views import  gmail_notify, TeamMemberViewSet, InboxViewSet, Channel
 from .views.message_view import  MessageViewSet
 from .views.conversations import  ConversationListView
 from .views.google_integration import google_callback
+from .views.outlook_integration import outlook_callback
 
 
 router = routers.DefaultRouter()
@@ -19,8 +20,12 @@ urlpatterns = [
     path('', include(router.urls)),
 
     #  Add Google OAuth callback path
-    path('auth/google/callback', google_callback, name='google_callback'),
-        # Gmail Pub/Sub push notification webhook
+    path('auth/google/callback', google_callback, name='google_callback'),    
+    
+    #  Add Google OAuth callback path
+    path('auth/outlook/callback', outlook_callback, name='outlook_callback'),
+
+    # Gmail Pub/Sub push notification webhook
     path('gmail/push/', gmail_notify, name='gmail_notify'),
 
     path("conversations/", ConversationListView.as_view(), name="conversation-list"),
