@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '../../../pages/ui/Button';
 import { Globe } from 'lucide-react';
 
-interface EmailChannelFormData {
+interface ChannelFormData {
   provider: 'gmail' | 'outlook' | 'custom';
-  email: string;
+  identifier: string;
   imapHost?: string;
   imapPort?: string;
   smtpHost?: string;
@@ -14,14 +14,14 @@ interface EmailChannelFormData {
 }
 
 interface AddChannelFormProps {
-  onSubmit: (data: EmailChannelFormData) => void;
+  onSubmit: (data: ChannelFormData) => void;
   onCancel: () => void;
 }
 
 export default function AddChannelForm({ onSubmit, onCancel }: AddChannelFormProps) {
-  const [formData, setFormData] = useState<EmailChannelFormData>({
+  const [formData, setFormData] = useState<ChannelFormData>({
     provider: 'gmail',
-    email: '',
+    identifier: '',
     imapHost: '',
     imapPort: '',
     smtpHost: '',
@@ -117,7 +117,7 @@ export default function AddChannelForm({ onSubmit, onCancel }: AddChannelFormPro
   const handleProviderChange = (provider: 'gmail' | 'outlook' | 'custom') => {
     setFormData(prev => ({
       provider,
-      email: provider === 'custom' ? prev.email : '',
+      identifier: provider === 'custom' ? prev.identifier : '',
       imapHost: provider === 'custom' ? prev.imapHost : '',
       imapPort: provider === 'custom' ? prev.imapPort : '',
       smtpHost: provider === 'custom' ? prev.smtpHost : '',
@@ -160,7 +160,7 @@ export default function AddChannelForm({ onSubmit, onCancel }: AddChannelFormPro
     setConnectionStatus('Testing connection...');
     try {
       await new Promise(resolve => setTimeout(resolve, 1000));
-      if (!formData.email) throw new Error('Email is required');
+      if (!formData.identifier) throw new Error('Email is required');
       setConnectionStatus('Connected successfully');
       onSubmit(formData);
     } catch {

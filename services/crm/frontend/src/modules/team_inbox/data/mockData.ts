@@ -1,4 +1,4 @@
-import { Conversation, Contact, Tag, Message, Attachment, InternalNote, SharedInbox, TeamMember, EmailChannel, } from '../types';
+import { Conversation, Contact, Tag, Message, Attachment, InternalNote, SharedInbox, TeamMember, Channel, } from '../types';
 
 export const mockTags: Tag[] = [
   { id: '1', name: 'Billing', color: '#3B82F6', shared: true },
@@ -39,7 +39,7 @@ export const mockTeamMembers: TeamMember[] = [
 ];
 
 // Mock email channels
-export const mockEmailChannels: EmailChannel[] = [
+export const mockChannels: Channel[] = [
   {
     id: '1',
     name: 'Support Email',
@@ -91,7 +91,7 @@ export const mockSharedInboxes: SharedInbox[] = [
     name: 'Support Team',
     description: 'Customer support and technical assistance',
     members: mockTeamMembers,
-    channels: [mockEmailChannels[0], mockEmailChannels[2]],
+    channels: [mockChannels[0], mockChannels[2]],
     createdBy: '1',
     createdAt: new Date('2024-01-10'),
     updatedAt: new Date(),
@@ -125,7 +125,7 @@ export const mockSharedInboxes: SharedInbox[] = [
     name: 'Sales Team',
     description: 'Sales inquiries and lead management',
     members: mockTeamMembers.slice(0, 2),
-    channels: [mockEmailChannels[1]],
+    channels: [mockChannels[1]],
     createdBy: '1',
     createdAt: new Date('2024-01-12'),
     updatedAt: new Date(),

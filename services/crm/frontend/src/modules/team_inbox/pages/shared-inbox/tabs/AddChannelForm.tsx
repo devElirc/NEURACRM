@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "../../../pages/ui/Button";
 import { Globe } from "lucide-react";
 
-interface EmailChannelFormData {
+interface ChannelFormData {
   provider: ProviderType;
-  email: string;
+  identifier: string;
   imapHost?: string;
   imapPort?: string;
   smtpHost?: string;
@@ -16,7 +16,7 @@ interface EmailChannelFormData {
 type ProviderType = "gmail" | "outlook" | "custom";
 
 interface AddChannelFormProps {
-  onSubmit: (data: { provider: string; email: string }) => void;
+  onSubmit: (data: { provider: string; identifier: string }) => void;
   onCancel: () => void;
 }
 
@@ -63,15 +63,15 @@ const ProviderSelector: React.FC<{
 
 /** Fields for custom IMAP/SMTP provider */
 const CustomProviderFields: React.FC<{
-  formData: EmailChannelFormData;
-  setFormData: React.Dispatch<React.SetStateAction<EmailChannelFormData>>;
+  formData: ChannelFormData;
+  setFormData: React.Dispatch<React.SetStateAction<ChannelFormData>>;
 }> = ({ formData, setFormData }) => (
   <div className="space-y-4">
     <input
       type="email"
       placeholder="Email"
-      value={formData.email}
-      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+      value={formData.identifier}
+      onChange={(e) => setFormData({ ...formData, identifier: e.target.value })}
       className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600"
     />
     {(
@@ -93,9 +93,9 @@ const CustomProviderFields: React.FC<{
 );
 
 export default function AddChannelForm({ onSubmit, onCancel }: AddChannelFormProps) {
-  const [formData, setFormData] = useState<EmailChannelFormData>({
+  const [formData, setFormData] = useState<ChannelFormData>({
     provider: "gmail",
-    email: "",
+    identifier: "",
   });
 
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
@@ -106,15 +106,15 @@ export default function AddChannelForm({ onSubmit, onCancel }: AddChannelFormPro
     const handleMessage = async (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
 
-      const { status, email } = event.data || {};
+      const { status, identifier } = event.data || {};
       if (!status) return;
 
       if (status.endsWith("_connected")) {
         setConnectionStatus("Connected successfully!");
-        setFormData((prev) => ({ ...prev, email }));
+        setFormData((prev) => ({ ...prev, identifier }));
 
         try {
-          onSubmit({ provider: formData.provider, email });
+          onSubmit({ provider: formData.provider, identifier });
         } catch (err) {
           setConnectionStatus("Team Inbox creation failed.");
         }
@@ -177,7 +177,7 @@ export default function AddChannelForm({ onSubmit, onCancel }: AddChannelFormPro
       e.preventDefault();
       setConnectionStatus("Testing connection...");
       try {
-        if (!formData.email)
+        if (!formData.identifier)
           throw new Error("Email is required for custom provider");
 
         for (const field of [
@@ -188,7 +188,7 @@ export default function AddChannelForm({ onSubmit, onCancel }: AddChannelFormPro
           "username",
           "password",
         ]) {
-          if (!formData[field as keyof EmailChannelFormData]) {
+          if (!formData[field as keyof ChannelFormData]) {
             throw new Error("All fields are required for custom provider");
           }
         }
@@ -196,7 +196,7 @@ export default function AddChannelForm({ onSubmit, onCancel }: AddChannelFormPro
         // Simulated connection
         await new Promise((res) => setTimeout(res, 800));
         setConnectionStatus("Connected successfully!");
-        onSubmit({ provider: formData.provider, email: formData.email });
+        onSubmit({ provider: formData.provider, identifier: formData.identifier });
         onCancel();
       } catch (err) {
         setConnectionStatus((err as Error).message);
@@ -223,7 +223,7 @@ export default function AddChannelForm({ onSubmit, onCancel }: AddChannelFormPro
         <ProviderSelector
           selected={formData.provider}
           onSelect={(provider) =>
-            setFormData({ provider, email: "" })
+            setFormData({ provider, identifier: "" })
           }
         />
 

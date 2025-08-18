@@ -335,10 +335,10 @@ export interface AuditLog {
   timestamp: Date;
 }
 
-export interface EmailChannel {
+export interface Channel {
   id: string;
   name: string;
-  email: string;
+  identifier: string;
   provider: 'gmail' | 'outlook' | 'custom';
   status: 'connected' | 'disconnected';
   imapHost?: string;
@@ -389,7 +389,7 @@ export interface SharedInbox {
   name: string;
   description?: string;
   members: TeamMember[];
-  channels: EmailChannel[];
+  channels: Channel[];
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;

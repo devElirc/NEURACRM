@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { SharedInbox, EmailChannel } from '../../../types';
+import { SharedInbox, Channel } from '../../../types';
 import { Plus, Mail, Settings } from 'lucide-react';
 import { Button } from '../../../pages/ui/Button';
 import AddChannelForm from './AddChannelForm';
 
-interface EmailChannelFormData {
+interface ChannelFormData {
   provider: 'gmail' | 'outlook' | 'custom';
-  email: string;
+  identifier: string;
   imapHost?: string;
   imapPort?: string;
   smtpHost?: string;
@@ -22,18 +22,18 @@ interface ChannelsTabProps {
 
 export function ChannelsTab({ inbox }: ChannelsTabProps) {
   const [showAddChannelForm, setShowAddChannelForm] = useState(false);
-  const [channels, setChannels] = useState<EmailChannel[]>(inbox.channels);
+  const [channels, setChannels] = useState<Channel[]>(inbox.channels);
   console.log("channels--", channels);
 
-  const handleAddChannel = (channelData: EmailChannelFormData) => {
+  const handleAddChannel = (channelData: ChannelFormData) => {
     console.log("🔍 Handling channel addition:", channelData);
     setShowAddChannelForm(false); // Cancel/Close AddChannelForm first
     setTimeout(() => { // Ensure form is closed before alert
-      alert(`✅ Channel added successfully! Email: ${channelData.email}`); // Show alert next
-      const newChannel: EmailChannel = {
+      alert(`✅ Channel added successfully! Email: ${channelData.identifier}`); // Show alert next
+      const newChannel: Channel = {
         id: Date.now().toString(),
-        name: channelData.email,
-        email: channelData.email,
+        name: channelData.identifier,
+        identifier: channelData.identifier,
         provider: channelData.provider,
         status: 'connected',
         imapHost: channelData.imapHost,
@@ -81,7 +81,7 @@ export function ChannelsTab({ inbox }: ChannelsTabProps) {
               </div>
               <div>
                 <h4 className="font-medium text-gray-900 dark:text-white">{channel.name}</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">{channel.email}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{channel.identifier}</p>
                 {channel.createdAt && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Added: {new Date(channel.createdAt).toLocaleString()}

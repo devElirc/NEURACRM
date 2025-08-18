@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 interface AddChannelFormProps {
-  onSubmit: (data: { provider: string; email: string }) => void;
+  onSubmit: (data: { provider: string; identifier: string }) => void;
 }
 
 export default function AddChannelForm({ onSubmit }: AddChannelFormProps) {

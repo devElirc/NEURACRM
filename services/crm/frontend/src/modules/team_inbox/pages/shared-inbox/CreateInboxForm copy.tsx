@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { SharedInbox } from '../../types';
 import { Button } from '../../pages/ui/Button';
-import { mockTeamMembers, mockEmailChannels } from '../../data/mockData';
+import { mockTeamMembers, mockChannels } from '../../data/mockData';
 
 interface CreateInboxFormProps {
   onSubmit: (data: Partial<SharedInbox>) => void;
@@ -23,7 +23,7 @@ export function CreateInboxForm({ onSubmit, onCancel }: CreateInboxFormProps) {
       formData.selectedMembers.includes(member.id)
     );
 
-    const channels = mockEmailChannels.filter(channel =>
+    const channels = mockChannels.filter(channel =>
       formData.selectedChannels.includes(channel.id)
     );
 

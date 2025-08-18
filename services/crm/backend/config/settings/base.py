@@ -350,4 +350,12 @@ OUTLOOK_REDIRECT_URI = os.getenv(
 
 )
 
+OUTLOOK_WEBHOOK_URL = os.getenv(
+    "OUTLOOK_WEBHOOK_URL",
+    # "https://app.yourdomain.com/api/inbox/outlook/notify/"
+    "https://194f8838e6ab.ngrok-free.app/api/inbox/outlook/notify/"
+
+)
+
+
 
