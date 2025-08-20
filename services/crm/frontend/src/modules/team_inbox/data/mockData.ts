@@ -1,5 +1,109 @@
 import { Conversation, Contact, Tag, Message, Attachment, InternalNote, SharedInbox, TeamMember, Channel, } from '../types';
 
+import { Teammate, TeamInbox } from '../types/teammate';
+
+export const mockTeamInboxes: TeamInbox[] = [
+  {
+    id: '1',
+    name: 'General Support',
+    description: 'Main customer support inbox',
+    color: 'bg-blue-500'
+  },
+  {
+    id: '2',
+    name: 'Sales Inquiries',
+    description: 'Sales and pre-sales questions',
+    color: 'bg-green-500'
+  },
+  {
+    id: '3',
+    name: 'Technical Support',
+    description: 'Technical issues and bug reports',
+    color: 'bg-purple-500'
+  },
+  {
+    id: '4',
+    name: 'Billing',
+    description: 'Payment and billing related queries',
+    color: 'bg-orange-500'
+  },
+  {
+    id: '5',
+    name: 'Product Feedback',
+    description: 'Feature requests and product feedback',
+    color: 'bg-pink-500'
+  }
+];
+
+export const mockTeammates: Teammate[] = [
+  {
+    id: '1',
+    name: 'Sarah Johnson',
+    email: 'sarah@company.com',
+    role: 'Admin',
+    avatar: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=400',
+    status: 'Active',
+    lastSeen: '2 minutes ago',
+    joinedDate: 'Jan 15, 2024',
+    teamInboxes: ['1', '2', '3']
+  },
+  {
+    id: '2',
+    name: 'Michael Chen',
+    email: 'michael@company.com',
+    role: 'Agent',
+    avatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=400',
+    status: 'Active',
+    lastSeen: '1 hour ago',
+    joinedDate: 'Feb 3, 2024',
+    teamInboxes: ['1', '3']
+  },
+  {
+    id: '3',
+    name: 'Emily Rodriguez',
+    email: 'emily@company.com',
+    role: 'Agent',
+    avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
+    status: 'Active',
+    lastSeen: '30 minutes ago',
+    joinedDate: 'Jan 28, 2024',
+    teamInboxes: ['2', '4']
+  },
+  {
+    id: '4',
+    name: 'David Kim',
+    email: 'david@company.com',
+    role: 'Viewer',
+    avatar: 'https://images.pexels.com/photos/1181690/pexels-photo-1181690.jpeg?auto=compress&cs=tinysrgb&w=400',
+    status: 'Inactive',
+    lastSeen: '2 days ago',
+    joinedDate: 'Mar 10, 2024',
+    teamInboxes: ['1']
+  },
+  {
+    id: '5',
+    name: 'Lisa Thompson',
+    email: 'lisa@company.com',
+    role: 'Agent',
+    avatar: 'https://images.pexels.com/photos/1130626/pexels-photo-1130626.jpeg?auto=compress&cs=tinysrgb&w=400',
+    status: 'Active',
+    lastSeen: '5 minutes ago',
+    joinedDate: 'Feb 20, 2024',
+    teamInboxes: ['1', '2', '5']
+  },
+  {
+    id: '6',
+    name: 'James Wilson',
+    email: 'james@company.com',
+    role: 'Admin',
+    avatar: 'https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg?auto=compress&cs=tinysrgb&w=400',
+    status: 'Active',
+    lastSeen: '1 hour ago',
+    joinedDate: 'Jan 5, 2024',
+    teamInboxes: ['1', '2', '3', '4', '5']
+  }
+];
+
 export const mockTags: Tag[] = [
   { id: '1', name: 'Billing', color: '#3B82F6', shared: true },
   { id: '2', name: 'Support', color: '#10B981', shared: true },

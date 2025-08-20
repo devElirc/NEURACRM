@@ -32,8 +32,8 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeFilter, onFilterChange, currentView, onCreateInbox,
-  onViewChange,   sharedInboxes = []
- }: SidebarProps) {
+  onViewChange, sharedInboxes = []
+}: SidebarProps) {
   const { user, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
 
@@ -46,6 +46,7 @@ export function Sidebar({ activeFilter, onFilterChange, currentView, onCreateInb
 
   const menuItems = [
     { id: 'inbox', label: 'Inbox', icon: Inbox, count: 12 },
+    { id: 'teammates', label: 'Teammates', icon: Users },
     { id: 'unassigned', label: 'Unassigned', icon: UserX, count: 3 },
     { id: 'assigned-to-me', label: 'Assigned to Me', icon: UserCheck, count: 5 },
     { id: 'snoozed', label: 'Snoozed', icon: Clock, count: 2 },
@@ -188,8 +189,8 @@ export function Sidebar({ activeFilter, onFilterChange, currentView, onCreateInb
                 key={inbox.id}
                 onClick={() => onFilterChange(`${inbox.name}`)}
                 className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${activeFilter === `${inbox.name}`
-                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                    : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
+                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                  : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
                   }`}
               >
                 <Users className="w-4 h-4 mr-3" />

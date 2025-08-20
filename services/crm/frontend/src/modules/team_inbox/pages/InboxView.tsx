@@ -4,6 +4,7 @@ import { ConversationList } from './ConversationList';
 import { ConversationView } from './ConversationView';
 import { ContactPanel } from './ContactPanel';
 import { EmailComposer } from './EmailComposer';
+import TeammatesPage from './teammate/TeammatesPage';
 import { Sidebar } from './Sidebar';
 import { SharedInboxManager } from './shared-inbox/SharedInboxManager';
 import { Conversation, Contact, Message, SharedInbox } from '../types';
@@ -189,6 +190,9 @@ export function InboxView() {
           return conv.messages.some((msg) => msg.from.email === user?.email);
         case 'archived':
           return conv.isArchived;
+        case 'Teammates':
+          return conv.isArchived;
+
         default:
           return !conv.isArchived;
       }
@@ -307,6 +311,110 @@ export function InboxView() {
     }));
   }, [sharedInboxes, conversations]);
 
+  // return (
+  //   <div className="flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
+  //     <Toaster position="top-right" />
+  //     <Sidebar
+  //       activeFilter={sidebarFilter}
+  //       onFilterChange={setSidebarFilter}
+  //       currentView="inbox"
+  //       onViewChange={() => { }}
+  //       onCreateInbox={() => setShowSharedInboxManager(true)}
+  //       sharedInboxes={sharedInboxesWithCounts}
+  //     />
+
+  //     <TeammatesPage />
+
+  //     <div className="flex-1 flex overflow-hidden">
+  //       <div className="w-96 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-colors">
+  //         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+  //           <div className="flex items-center justify-between mb-3">
+  //             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+  //               {sidebarFilter.charAt(0).toUpperCase() + sidebarFilter.slice(1).replace('-', ' ')}
+  //             </h2>
+  //             <div className="flex items-center space-x-2">
+  //               <button
+  //                 onClick={handleRefresh}
+  //                 disabled={isRefreshing}
+  //                 className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
+  //                 title="Refresh"
+  //               >
+  //                 <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+  //               </button>
+  //               <button className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors" title="Filter">
+  //                 <Filter className="h-4 w-4" />
+  //               </button>
+  //               <button className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors" title="Settings">
+  //                 <Settings className="h-4 w-4" />
+  //               </button>
+  //             </div>
+  //           </div>
+
+  //           <div className="flex items-center justify-between">
+  //             <div className="text-sm text-gray-500 dark:text-gray-400">
+  //               {filteredConversations.length} conversation{filteredConversations.length !== 1 ? 's' : ''}
+  //             </div>
+  //             <button
+  //               onClick={() => setShowComposer(true)}
+  //               className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+  //             >
+  //               <Plus className="h-4 w-4 mr-1" />
+  //               Compose
+  //             </button>
+  //           </div>
+
+  //           <div className="mt-3">
+  //             <input
+  //               type="text"
+  //               placeholder="Search conversations..."
+  //               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors"
+  //             />
+  //           </div>
+  //         </div>
+
+  //         <ConversationList
+  //           conversations={filteredConversations}
+  //           selectedConversation={selectedConversation}
+  //           onSelectConversation={setSelectedConversation}
+  //         />
+  //       </div>
+
+  //       <div className="flex-1 flex">
+  //         <ConversationView
+  //           conversation={selectedConversation}
+  //           onContactSelect={setSelectedContact}
+  //           onReply={(emailData) => handleReply(emailData)}
+
+
+  //         />
+  //         {/* <ContactPanel contact={selectedContact} /> */}
+  //       </div>
+  //     </div>
+
+  //     {showComposer && (
+  //       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+  //         <div className="w-full max-w-4xl max-h-[90vh] overflow-hidden">
+  //           <EmailComposer
+  //             onSend={handleSendEmail}
+  //             onCancel={() => setShowComposer(false)}
+  //           />
+  //         </div>
+  //       </div>
+  //     )}
+
+  //     {showSharedInboxManager && (
+  //       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+  //         <SharedInboxManager
+  //           onClose={() => setShowSharedInboxManager(false)}
+  //           onCreateInbox={handleCreateSharedInbox}
+  //           sharedInboxes={sharedInboxes}
+  //         />
+  //       </div>
+  //     )}
+  //   </div>
+  // );
+
+
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
       <Toaster position="top-right" />
@@ -319,71 +427,74 @@ export function InboxView() {
         sharedInboxes={sharedInboxesWithCounts}
       />
 
-      <div className="flex-1 flex overflow-hidden">
-        <div className="w-96 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-colors">
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {sidebarFilter.charAt(0).toUpperCase() + sidebarFilter.slice(1).replace('-', ' ')}
-              </h2>
-              <div className="flex items-center space-x-2">
+      {/* 👇 Only show TeammatesPage when filter is "Teammates" */}
+      {sidebarFilter === 'teammates' ? (
+        <TeammatesPage />
+      ) : (
+        <div className="flex-1 flex overflow-hidden">
+          <div className="w-96 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-colors">
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {sidebarFilter.charAt(0).toUpperCase() + sidebarFilter.slice(1).replace('-', ' ')}
+                </h2>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
+                    title="Refresh"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  </button>
+                  <button className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors" title="Filter">
+                    <Filter className="h-4 w-4" />
+                  </button>
+                  <button className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors" title="Settings">
+                    <Settings className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  {filteredConversations.length} conversation{filteredConversations.length !== 1 ? 's' : ''}
+                </div>
                 <button
-                  onClick={handleRefresh}
-                  disabled={isRefreshing}
-                  className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
-                  title="Refresh"
+                  onClick={() => setShowComposer(true)}
+                  className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
                 >
-                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <Plus className="h-4 w-4 mr-1" />
+                  Compose
                 </button>
-                <button className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors" title="Filter">
-                  <Filter className="h-4 w-4" />
-                </button>
-                <button className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors" title="Settings">
-                  <Settings className="h-4 w-4" />
-                </button>
+              </div>
+
+              <div className="mt-3">
+                <input
+                  type="text"
+                  placeholder="Search conversations..."
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors"
+                />
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                {filteredConversations.length} conversation{filteredConversations.length !== 1 ? 's' : ''}
-              </div>
-              <button
-                onClick={() => setShowComposer(true)}
-                className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Compose
-              </button>
-            </div>
-
-            <div className="mt-3">
-              <input
-                type="text"
-                placeholder="Search conversations..."
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors"
-              />
-            </div>
+            <ConversationList
+              conversations={filteredConversations}
+              selectedConversation={selectedConversation}
+              onSelectConversation={setSelectedConversation}
+            />
           </div>
 
-          <ConversationList
-            conversations={filteredConversations}
-            selectedConversation={selectedConversation}
-            onSelectConversation={setSelectedConversation}
-          />
+          <div className="flex-1 flex">
+            <ConversationView
+              conversation={selectedConversation}
+              onContactSelect={setSelectedContact}
+              onReply={(emailData) => handleReply(emailData)}
+            />
+            {/* <ContactPanel contact={selectedContact} /> */}
+          </div>
         </div>
-
-        <div className="flex-1 flex">
-          <ConversationView
-            conversation={selectedConversation}
-            onContactSelect={setSelectedContact}
-            onReply={(emailData) => handleReply(emailData)}
-
-
-          />
-          {/* <ContactPanel contact={selectedContact} /> */}
-        </div>
-      </div>
+      )}
 
       {showComposer && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -401,10 +512,11 @@ export function InboxView() {
           <SharedInboxManager
             onClose={() => setShowSharedInboxManager(false)}
             onCreateInbox={handleCreateSharedInbox}
-            sharedInboxes = {sharedInboxes}
+            sharedInboxes={sharedInboxes}
           />
         </div>
       )}
     </div>
   );
+
 }
