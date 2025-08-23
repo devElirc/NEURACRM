@@ -38,7 +38,8 @@ class User(AbstractUser):
     last_name = models.CharField(max_length=150)
     phone = models.CharField(max_length=20, blank=True)
     is_superadmin = models.BooleanField(default=False)
-    tenants = models.ManyToManyField(Client, related_name='users', blank=True)
+    tenants = models.ManyToManyField("Client", related_name="users", blank=True)
+    avatar = models.URLField(blank=True, null=True)  # ✅ Added avatar support
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -51,6 +52,7 @@ class User(AbstractUser):
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}"
+    
 
 class TenantEmailMapping(models.Model):
     email = models.EmailField(unique=True, db_index=True)

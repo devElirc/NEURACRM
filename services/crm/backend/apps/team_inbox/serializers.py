@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from .models import (
     TeamMember, Inbox, ChannelAccount, Tag, Conversation,
     Message, Attachment, InternalNote, Label, Comment, Task, CalendarEvent
@@ -7,12 +8,57 @@ from .models import (
 
 User = get_user_model()
 
+
 class TeamMemberSerializer(serializers.ModelSerializer):
-    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    # Flatten User fields
+    firstName = serializers.CharField(source="user.first_name", read_only=True)
+    lastName = serializers.CharField(source="user.last_name", read_only=True)
+    fullName = serializers.SerializerMethodField()
+    email = serializers.EmailField(source="user.email", read_only=True)
+    avatar = serializers.URLField(source="user.avatar", read_only=True)
+
+    # Computed fields
+    status = serializers.SerializerMethodField()
+    lastSeen = serializers.SerializerMethodField()
+    joinedDate = serializers.SerializerMethodField()
+    teamInboxes = serializers.SerializerMethodField()
 
     class Meta:
         model = TeamMember
-        fields = ['id', 'user', 'role', 'is_active']
+        fields = [
+            "id",
+            "firstName",
+            "lastName",
+            "fullName",
+            "email",
+            "role",
+            "avatar",
+            "status",
+            "lastSeen",
+            "joinedDate",
+            "teamInboxes",
+        ]
+
+    # --- Computed field resolvers ---
+    def get_fullName(self, obj):
+        first = obj.user.first_name or ""
+        last = obj.user.last_name or ""
+        return f"{first} {last}".strip()
+
+    def get_status(self, obj):
+        return "Active" if obj.is_active else "Inactive"
+
+    def get_lastSeen(self, obj):
+        return obj.last_seen.isoformat() if obj.last_seen else None
+
+    def get_joinedDate(self, obj):
+        if obj.user and getattr(obj.user, "created_at", None):
+            return obj.user.created_at.strftime("%Y-%m-%d")
+        return None
+
+    def get_teamInboxes(self, obj):
+        return list(obj.team_inboxes.values_list("id", flat=True))
+    
 
 class ChannelAccountSerializer(serializers.ModelSerializer):
     class Meta:
@@ -85,9 +131,22 @@ class CalendarEventSerializer(serializers.ModelSerializer):
         fields = ['id', 'message', 'title', 'start_time', 'end_time', 'created_by']
 
 
+# class EmailAddressSerializer(serializers.Serializer):
+#     name = serializers.CharField(required=False, allow_blank=True)
+#     email = serializers.EmailField()
+
 class EmailAddressSerializer(serializers.Serializer):
     name = serializers.CharField(required=False, allow_blank=True)
     email = serializers.EmailField()
+
+    def to_representation(self, instance):
+        # If instance is a string, treat it as email
+        if isinstance(instance, str):
+            return {"email": instance, "name": ""}
+        elif isinstance(instance, dict):
+            # Ensure 'email' key exists
+            return {"email": instance.get("email", ""), "name": instance.get("name", "")}
+        return super().to_representation(instance)
 
 class AttachmentSerializer(serializers.ModelSerializer):
     class Meta:
@@ -110,85 +169,6 @@ class TagSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
         fields = ['id', 'name', 'color']
-
-
-# class MessageSerializer(serializers.ModelSerializer):
-#     from_ = EmailAddressSerializer(source='from_email')
-#     to = EmailAddressSerializer(many=True)
-#     cc = EmailAddressSerializer(many=True, required=False, allow_null=True)
-#     bcc = EmailAddressSerializer(many=True, required=False, allow_null=True)
-#     replyTo = serializers.SerializerMethodField()
-#     threadId = serializers.CharField(source='thread_id', allow_null=True)
-#     messageId = serializers.CharField(source='message_id')
-#     inReplyTo = serializers.CharField(source='in_reply_to', required=False, allow_null=True)
-#     references = serializers.ListField(child=serializers.CharField(), allow_null=True)
-#     htmlContent = serializers.CharField(source='html_content', required=False, allow_null=True)
-#     isRead = serializers.BooleanField(source='is_read')
-#     isStarred = serializers.BooleanField(source='is_starred')
-#     isDraft = serializers.BooleanField(source='is_draft')
-#     attachments = AttachmentSerializer(many=True, read_only=True)
-#     internalNotes = InternalNoteSerializer(many=True, source='internal_notes', read_only=True)
-#     labels = LabelSerializer(many=True, read_only=True)
-#     priority = serializers.ChoiceField(choices=Message.PRIORITY_CHOICES)
-#     source = serializers.ChoiceField(choices=Message.SOURCE_CHOICES)
-
-#     class Meta:
-#         model = Message
-#         fields = [
-#             'id',
-#             'threadId',
-#             'from_',
-#             'to',
-#             'cc',
-#             'bcc',
-#             'replyTo',
-#             'subject',
-#             'content',
-#             'htmlContent',
-#             'timestamp',
-#             'isRead',
-#             'isStarred',
-#             'isDraft',
-#             'messageId',
-#             'inReplyTo',
-#             'references',
-#             'attachments',
-#             'internalNotes',
-#             'labels',
-#             'priority',
-#             'source',
-#         ]
-
-#     def get_replyTo(self, obj):
-#         reply_to = obj.reply_to
-#         if not reply_to:
-#             return None
-#         if isinstance(reply_to, list):
-#             return reply_to[0] if reply_to else None
-#         if isinstance(reply_to, dict):
-#             return reply_to
-#         return None
-
-#     def to_representation(self, instance):
-#         data = super().to_representation(instance)
-#         data['from'] = data.pop('from_')
-#         return data
-
-#     def create(self, validated_data):
-#         # Just create the Message; conversation linking happens in the view
-#         from_email = validated_data.pop('from_email')
-#         to_list = validated_data.pop('to', [])
-#         cc_list = validated_data.pop('cc', None)
-#         bcc_list = validated_data.pop('bcc', None)
-
-#         message = Message.objects.create(
-#             from_email=from_email,
-#             to=to_list,
-#             cc=cc_list,
-#             bcc=bcc_list,
-#             **validated_data
-#         )
-#         return message
 
 
 class MessageSerializer(serializers.ModelSerializer):
@@ -284,6 +264,87 @@ class MessageSerializer(serializers.ModelSerializer):
         )
 
         return message
+
+
+# class MessageSerializer(serializers.ModelSerializer):
+#     from_ = EmailAddressSerializer(source='from_email')
+#     to = EmailAddressSerializer(many=True)
+#     cc = EmailAddressSerializer(many=True, required=False, allow_null=True)
+#     bcc = EmailAddressSerializer(many=True, required=False, allow_null=True)
+#     replyTo = serializers.SerializerMethodField()
+#     threadId = serializers.CharField(source='thread_id', allow_null=True)
+#     messageId = serializers.CharField(source='message_id')
+#     inReplyTo = serializers.CharField(source='in_reply_to', required=False, allow_null=True)
+#     references = serializers.ListField(child=serializers.CharField(), allow_null=True)
+#     htmlContent = serializers.CharField(source='html_content', required=False, allow_null=True)
+#     isRead = serializers.BooleanField(source='is_read')
+#     isStarred = serializers.BooleanField(source='is_starred')
+#     isDraft = serializers.BooleanField(source='is_draft')
+#     attachments = AttachmentSerializer(many=True, read_only=True)
+#     internalNotes = InternalNoteSerializer(many=True, source='internal_notes', read_only=True)
+#     labels = LabelSerializer(many=True, read_only=True)
+#     priority = serializers.ChoiceField(choices=Message.PRIORITY_CHOICES)
+#     source = serializers.ChoiceField(choices=Message.SOURCE_CHOICES)
+
+#     class Meta:
+#         model = Message
+#         fields = [
+#             'id', 'threadId', 'from_', 'to', 'cc', 'bcc', 'replyTo',
+#             'subject', 'content', 'htmlContent', 'timestamp', 'isRead',
+#             'isStarred', 'isDraft', 'messageId', 'inReplyTo', 'references',
+#             'attachments', 'internalNotes', 'labels', 'priority', 'source',
+#         ]
+
+#     def get_replyTo(self, obj):
+#         reply_to = getattr(obj, "reply_to", None)
+#         if not reply_to:
+#             return None
+#         if isinstance(reply_to, list) and reply_to:
+#             return reply_to[0]
+#         if isinstance(reply_to, dict):
+#             return reply_to
+#         return None
+
+#     def to_representation(self, instance):
+#         data = super().to_representation(instance)
+#         data['from'] = data.pop('from_', None)
+#         return data
+
+#     def create(self, validated_data):
+#         # from_email can be dict or string
+#         from_email = validated_data.pop('from_email', None)
+#         if isinstance(from_email, dict):
+#             from_email_value = from_email.get('email')
+#         elif isinstance(from_email, str):
+#             from_email_value = from_email
+#         else:
+#             raise serializers.ValidationError({"from_": "from_email is required"})
+
+#         if not from_email_value:
+#             raise serializers.ValidationError({"from_": "from_email cannot be empty"})
+
+#         def extract_emails(lst):
+#             emails = []
+#             for addr in lst:
+#                 if isinstance(addr, dict):
+#                     emails.append(addr.get('email'))
+#                 elif isinstance(addr, str):
+#                     emails.append(addr)
+#             return emails
+
+#         to_list = extract_emails(validated_data.pop('to', []))
+#         cc_list = extract_emails(validated_data.pop('cc', []))
+#         bcc_list = extract_emails(validated_data.pop('bcc', []))
+
+#         message = Message.objects.create(
+#             from_email=from_email_value,
+#             to=to_list,
+#             cc=cc_list,
+#             bcc=bcc_list,
+#             **validated_data
+#         )
+#         return message
+    
 
 class ConversationSerializer(serializers.ModelSerializer):
     participants = EmailAddressSerializer(many=True)

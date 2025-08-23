@@ -9,6 +9,7 @@ class TenantSerializer(serializers.ModelSerializer):
     class Meta:
         model = Client
         fields = ["id", "schema_name", "name", "description", "is_active", "created_on"]
+        
 
 class UserSerializer(serializers.ModelSerializer):
     """

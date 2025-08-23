@@ -17,6 +17,7 @@ class ConversationPagination(PageNumberPagination):
     page_size_query_param = 'page_size'
     max_page_size = 100
 
+
 class ConversationListView(ListAPIView):
     serializer_class = ConversationSerializer
     permission_classes = [IsAuthenticated]
@@ -34,7 +35,7 @@ class ConversationListView(ListAPIView):
             'assigned_to', 'assigned_by', 'last_message'
         ).prefetch_related(
             'tags',
-            'messages',          
+            'messages',
             'last_message__labels'
         )
 

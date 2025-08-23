@@ -1,20 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, UserPlus, Send, CheckCircle } from 'lucide-react';
-import { NewTeammate, TeamInbox } from '../types/teammate';
+import { NewTeammate } from '../../types/teammate';
+import { SharedInbox } from '../../types';
 
 interface AddTeammateModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (teammate: NewTeammate) => void;
-  teamInboxes: TeamInbox[];
+  onAdd: (teammate: NewTeammate, sendInvite: boolean) => void;
+  teamInboxes: SharedInbox[];
 }
 
-const AddTeammateModal: React.FC<AddTeammateModalProps> = ({ isOpen, onClose, onAdd, teamInboxes }) => {
+const AddTeammateModal: React.FC<AddTeammateModalProps> = ({
+  isOpen,
+  onClose,
+  onAdd,
+  teamInboxes,
+}) => {
   const [formData, setFormData] = useState<NewTeammate>({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     role: 'Agent',
-    teamInboxes: []
+    teamInboxes: [],
   });
 
   const [errors, setErrors] = useState<Partial<NewTeammate>>({});
@@ -22,12 +29,39 @@ const AddTeammateModal: React.FC<AddTeammateModalProps> = ({ isOpen, onClose, on
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
+
+  const resetForm = () => {
+    setFormData({
+      firstName: '',
+      lastName: '',
+      email: '',
+      role: 'Agent',
+      teamInboxes: [],
+    });
+    setErrors({});
+    setSendInvite(true);
+  };
+
+  const handleChange = (field: keyof NewTeammate, value: string | string[]) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: undefined }));
+    }
+  };
+
+  const handleInboxToggle = (inboxId: string) => {
+    const updatedInboxes = formData.teamInboxes.includes(inboxId)
+      ? formData.teamInboxes.filter((id) => id !== inboxId)
+      : [...formData.teamInboxes, inboxId];
+    handleChange('teamInboxes', updatedInboxes);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validation
+
     const newErrors: Partial<NewTeammate> = {};
-    if (!formData.name.trim()) newErrors.name = 'Name is required';
+    if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
+    if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
     if (formData.teamInboxes.length === 0) newErrors.teamInboxes = 'At least one team inbox must be selected';
@@ -40,44 +74,24 @@ const AddTeammateModal: React.FC<AddTeammateModalProps> = ({ isOpen, onClose, on
     setIsSubmitting(true);
 
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    onAdd(formData);
-    
+    // Call parent onAdd
+    onAdd(formData, sendInvite);
+
     if (sendInvite) {
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
         resetForm();
         onClose();
-      }, 2000);
+      }, 1000);
     } else {
       resetForm();
       onClose();
     }
-    
+
     setIsSubmitting(false);
-  };
-
-  const resetForm = () => {
-    setFormData({ name: '', email: '', role: 'Agent', teamInboxes: [] });
-    setErrors({});
-    setSendInvite(true);
-  };
-
-  const handleChange = (field: keyof NewTeammate, value: string | string[]) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
-    }
-  };
-
-  const handleInboxToggle = (inboxId: string) => {
-    const updatedInboxes = formData.teamInboxes.includes(inboxId)
-      ? formData.teamInboxes.filter(id => id !== inboxId)
-      : [...formData.teamInboxes, inboxId];
-    
-    handleChange('teamInboxes', updatedInboxes);
   };
 
   if (!isOpen) return null;
@@ -91,8 +105,7 @@ const AddTeammateModal: React.FC<AddTeammateModalProps> = ({ isOpen, onClose, on
           </div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Invitation Sent!</h2>
           <p className="text-gray-600">
-            We've sent an invitation to <strong>{formData.email}</strong>. 
-            They'll receive an email with instructions to join your team.
+            We've sent an invitation to <strong>{formData.email}</strong>. They'll receive an email with instructions to join your team.
           </p>
         </div>
       </div>
@@ -109,54 +122,58 @@ const AddTeammateModal: React.FC<AddTeammateModalProps> = ({ isOpen, onClose, on
             </div>
             <h2 className="text-xl font-semibold text-gray-900">Add New Teammate</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <X className="w-5 h-5 text-gray-400" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Full Name
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => handleChange('name', e.target.value)}
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.name ? 'border-red-300' : 'border-gray-300'
-              }`}
-              placeholder="Enter teammate's full name"
-            />
-            {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+          {/* First & Last Name */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+              <input
+                type="text"
+                value={formData.firstName || ''}
+                onChange={(e) => handleChange('firstName', e.target.value)}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.firstName ? 'border-red-300' : 'border-gray-300'}`}
+                placeholder="Enter first name"
+              />
+              {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+              <input
+                type="text"
+                value={formData.lastName || ''}
+                onChange={(e) => handleChange('lastName', e.target.value)}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.lastName ? 'border-red-300' : 'border-gray-300'}`}
+                placeholder="Enter last name"
+              />
+              {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
+            </div>
           </div>
 
+          {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
             <input
               type="email"
               value={formData.email}
               onChange={(e) => handleChange('email', e.target.value)}
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.email ? 'border-red-300' : 'border-gray-300'
-              }`}
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.email ? 'border-red-300' : 'border-gray-300'}`}
               placeholder="teammate@company.com"
             />
             {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
           </div>
 
+          {/* Role */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Role
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
             <select
               value={formData.role}
-              onChange={(e) => handleChange('role', e.target.value as 'Admin' | 'Agent' | 'Viewer')}
+              onChange={(e) => handleChange('role', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="Agent">Agent</option>
@@ -170,12 +187,11 @@ const AddTeammateModal: React.FC<AddTeammateModalProps> = ({ isOpen, onClose, on
             </p>
           </div>
 
+          {/* Team Inboxes */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Team Inboxes
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-3">Team Inboxes</label>
             <div className="space-y-2 max-h-40 overflow-y-auto">
-              {teamInboxes.map(inbox => (
+              {teamInboxes.map((inbox) => (
                 <label key={inbox.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
                   <input
                     type="checkbox"
@@ -184,7 +200,7 @@ const AddTeammateModal: React.FC<AddTeammateModalProps> = ({ isOpen, onClose, on
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   />
                   <div className="flex items-center space-x-2 flex-1">
-                    <div className={`w-3 h-3 rounded-full ${inbox.color}`}></div>
+                    <div className={`w-3 h-3 rounded-full bg-purple-500`}></div>
                     <div>
                       <p className="text-sm font-medium text-gray-900">{inbox.name}</p>
                       <p className="text-xs text-gray-500">{inbox.description}</p>
@@ -196,6 +212,7 @@ const AddTeammateModal: React.FC<AddTeammateModalProps> = ({ isOpen, onClose, on
             {errors.teamInboxes && <p className="text-red-500 text-xs mt-1">{errors.teamInboxes}</p>}
           </div>
 
+          {/* Send Invite */}
           <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg">
             <input
               type="checkbox"
@@ -210,6 +227,7 @@ const AddTeammateModal: React.FC<AddTeammateModalProps> = ({ isOpen, onClose, on
             </label>
           </div>
 
+          {/* Buttons */}
           <div className="flex space-x-3 pt-4">
             <button
               type="button"
@@ -244,3 +262,4 @@ const AddTeammateModal: React.FC<AddTeammateModalProps> = ({ isOpen, onClose, on
 };
 
 export default AddTeammateModal;
+

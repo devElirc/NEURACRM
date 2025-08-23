@@ -1,10 +1,11 @@
 import React from 'react';
 import { MoreHorizontal, Mail, Calendar, Clock, Inbox } from 'lucide-react';
-import { Teammate, TeamInbox } from '../types/teammate';
+import { Teammate, TeamInbox } from '../../types/teammate';
+import { SharedInbox } from '../../types';
 
 interface TeammateCardProps {
   teammate: Teammate;
-  teamInboxes: TeamInbox[];
+  teamInboxes: SharedInbox[];
   onEdit: (teammate: Teammate) => void;
   onRemove: (id: string) => void;
 }
@@ -38,7 +39,7 @@ const TeammateCard: React.FC<TeammateCardProps> = ({ teammate, teamInboxes, onEd
           <div className="relative">
             <img
               src={teammate.avatar}
-              alt={teammate.name}
+              alt={teammate.fullName}
               className="w-12 h-12 rounded-full object-cover"
             />
             <div
@@ -48,7 +49,7 @@ const TeammateCard: React.FC<TeammateCardProps> = ({ teammate, teamInboxes, onEd
             />
           </div>
           <div className="flex-1">
-            <h3 className="font-semibold text-gray-900 text-lg">{teammate.name}</h3>
+            <h3 className="font-semibold text-gray-900 text-lg">{teammate.fullName}</h3>
             <div className="flex items-center text-gray-600 mt-1">
               <Mail className="w-4 h-4 mr-2" />
               <span className="text-sm">{teammate.email}</span>
@@ -70,7 +71,7 @@ const TeammateCard: React.FC<TeammateCardProps> = ({ teammate, teamInboxes, onEd
               <Calendar className="w-3 h-3 mr-1" />
               Joined {teammate.joinedDate}
             </div>
-            
+
             {/* Team Inboxes */}
             <div className="mt-3">
               <div className="flex items-center text-xs text-gray-500 mb-2">
@@ -81,7 +82,7 @@ const TeammateCard: React.FC<TeammateCardProps> = ({ teammate, teamInboxes, onEd
                 {getAssignedInboxes().map(inbox => (
                   <span
                     key={inbox.id}
-                    className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-white ${inbox.color}`}
+                    className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-white bg-purple-500`}
                   >
                     {inbox.name}
                   </span>

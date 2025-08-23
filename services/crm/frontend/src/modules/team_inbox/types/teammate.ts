@@ -1,6 +1,8 @@
 export interface Teammate {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
   email: string;
   role: 'Admin' | 'Agent' | 'Viewer';
   avatar: string;
@@ -11,7 +13,8 @@ export interface Teammate {
 }
 
 export interface NewTeammate {
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   role: 'Admin' | 'Agent' | 'Viewer';
   teamInboxes: string[];
