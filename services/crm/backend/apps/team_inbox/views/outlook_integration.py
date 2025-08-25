@@ -9,110 +9,85 @@ from ..models import Inbox, ChannelAccount
 from ...core.models import TenantEmailMapping
 from ..services.outlook_service import OutlookService
 
-
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def outlook_callback(request):
     """
-    Exchange code for tokens, create/update ChannelAccount, create Inbox,
-    start Outlook subscription, and save subscription_id.
+    Handles Outlook OAuth callback:
+    - Exchanges code for tokens
+    - Fetches user identifier (email)
+    - Creates/updates ChannelAccount and Inbox
+    - Starts Outlook subscription and saves subscription_id
     """
     try:
-        print("📩 [Outlook Callback] Incoming request")
         data = json.loads(request.body)
-        print("   🔹 Request Data:", data)
-
         code = data.get("code")
         inbox_name = data.get("inboxName")
 
         if not code or not inbox_name:
-            print("❌ Missing code or inboxName")
             return JsonResponse({"error": "Missing code or inboxName"}, status=400)
 
         # 1️⃣ Exchange code for tokens
-        print("🔑 Exchanging code for Outlook tokens...")
         token_data = exchange_code_for_outlook_token(code)
-        print("   ✅ Token response:", token_data)
-
         access_token = token_data.get("access_token")
         refresh_token = token_data.get("refresh_token")
         expires_in = token_data.get("expires_in")
 
         if not access_token:
-            print("❌ No access_token returned")
             return JsonResponse({"error": "No access_token returned"}, status=500)
 
-        # 2️⃣ Get user email / identifier
-        print("📧 Fetching Outlook user profile...")
+        # 2️⃣ Fetch user identifier
         identifier = get_outlook_user_email(access_token)
-        print("   ✅ Outlook Identifier:", identifier)
-
         if not identifier:
-            print("❌ Could not fetch identifier")
-            return JsonResponse({"error": "Could not fetch identifier"}, status=500)
+            return JsonResponse({"error": "Could not fetch Outlook identifier"}, status=500)
 
         # 3️⃣ Resolve tenant
         tenant = getattr(request, "tenant", None)
         if not tenant:
-            print("❌ Tenant not found")
             return JsonResponse({"error": "Tenant not found"}, status=400)
 
-        print(f"🏢 Using tenant: {tenant.schema_name}")
-
         with schema_context(tenant.schema_name):
-            # Save mapping in public schema
+            # Save tenant-email mapping in public schema
             with schema_context("public"):
                 TenantEmailMapping.objects.update_or_create(
                     email=identifier,
                     defaults={"tenant": tenant}
                 )
-                print("   ✅ TenantEmailMapping updated")
 
-            # Create inbox
+            # Create Inbox
             inbox, created_inbox = Inbox.objects.get_or_create(name=inbox_name)
-            print(f"   📥 Inbox: {inbox_name} (created={created_inbox})")
 
-            # Create / update channel account
+            # Create/Update ChannelAccount
             channel_account, created_account = ChannelAccount.objects.update_or_create(
                 identifier=identifier,
-                defaults=dict(
-                    provider="outlook",
-                    access_token=access_token,
-                    refresh_token=refresh_token,
-                    expires_in=expires_in,
-                    token_acquired_at=timezone.now(),
-                    inbox=inbox,
-                ),
+                defaults={
+                    "provider": "outlook",
+                    "access_token": access_token,
+                    "refresh_token": refresh_token,
+                    "expires_in": expires_in,
+                    "token_acquired_at": timezone.now(),
+                    "inbox": inbox,
+                },
             )
-            print(f"   👤 ChannelAccount: {identifier} (created={created_account})")
 
-        # 4️⃣ Start subscription and save subscription_id
-        print("🔔 Starting Outlook subscription...")
+        # 4️⃣ Start subscription
         service = OutlookService(channel_account)
-        webhook_url = settings.OUTLOOK_WEBHOOK_URL
-        print("   🌐 Webhook URL:", webhook_url)
-
-        subscription = service.start_subscription(webhook_url)
-        print("   ✅ Subscription response:", subscription)
+        subscription = service.start_subscription(settings.OUTLOOK_WEBHOOK_URL)
 
         subscription_id = subscription.get("id")
         if subscription_id:
             channel_account.subscription_id = subscription_id
             channel_account.save(update_fields=["subscription_id"])
-            print("   ✅ Subscription ID saved:", subscription_id)
-        else:
-            print("⚠️ Subscription created but no subscription_id returned")
 
         return JsonResponse({
             "email": identifier,
             "inbox_id": str(inbox.id),
             "new_inbox": created_inbox,
             "new_channel_account": created_account,
-            "subscription_id": subscription_id
+            "subscription_id": subscription_id,
         })
 
     except Exception as e:
-        print("❌ Exception in outlook_callback:", str(e))
         traceback.print_exc()
         return JsonResponse({"error": str(e)}, status=500)
 
