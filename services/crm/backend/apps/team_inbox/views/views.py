@@ -17,7 +17,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from django_tenants.utils import schema_context
 
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status, filters
 from rest_framework.permissions import AllowAny
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
@@ -644,10 +644,33 @@ class TagViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
 
+# class CommentViewSet(viewsets.ModelViewSet):
+#     queryset = Comment.objects.all()
+#     serializer_class = CommentSerializer
+#     permission_classes = [permissions.IsAuthenticated]
+
 class CommentViewSet(viewsets.ModelViewSet):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Optionally filter comments by message ID:
+        /api/comments/?message=<uuid>
+        Newest comments first.
+        """
+        queryset = super().get_queryset().order_by('-created_at')
+        message_id = self.request.query_params.get('message')
+        if message_id:
+            queryset = queryset.filter(message_id=message_id)
+        return queryset
+
+    def perform_create(self, serializer):
+        """
+        Automatically assign the logged-in user to the comment.
+        """
+        serializer.save(user=self.request.user)
 
 
 class TaskViewSet(viewsets.ModelViewSet):

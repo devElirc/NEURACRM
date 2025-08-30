@@ -34,7 +34,7 @@ urlpatterns = [
 
     path("conversations/", ConversationListView.as_view(), name="conversation-list"),
 
-        path("ai-reply/", AIReplyView.as_view(), name="ai-reply"),
+    path("ai-reply/", AIReplyView.as_view(), name="ai-reply"),
 
 
 ]

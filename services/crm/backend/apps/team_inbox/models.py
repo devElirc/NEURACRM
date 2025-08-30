@@ -279,10 +279,28 @@ class InternalNote(models.Model):
         return f'Note by {self.author} on {self.created_at}'
 
 
+# class Comment(models.Model):
+#     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+#     message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name='comments')
+#     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+#     content = models.TextField()
+#     created_at = models.DateTimeField(auto_now_add=True)
+
+#     def __str__(self):
+#         return f"Comment by {self.user.email} on {self.message.subject}"
+
+
 class Comment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name='comments')
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    message = models.ForeignKey(
+        'Message',
+        on_delete=models.CASCADE,
+        related_name='comments'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE
+    )
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 

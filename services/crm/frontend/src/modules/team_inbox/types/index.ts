@@ -102,6 +102,23 @@ export interface EmailAddress {
   name?: string;
 }
 
+export interface Comment {
+  id: string;
+  messageId: string;
+  author: {
+    id: string;
+    name: string;
+    email: string;
+    avatar?: string;
+  };
+  content: string;
+  timestamp: Date;
+  attachments?: Attachment[];
+  mentions?: string[];
+  isInternal: boolean;
+}
+
+
 export interface Conversation {
   id: string;
   threadId: string; // Email thread ID
@@ -138,7 +155,8 @@ export interface Attachment {
   isInline: boolean;
 }
 
-export interface InternalNote {
+export interface 
+InternalNote {
   id: string;
   conversationId: string;
   author: User;
