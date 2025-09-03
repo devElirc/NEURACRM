@@ -23,7 +23,7 @@ interface AddChannelFormProps {
 const OAUTH_CONFIG: Record<Exclude<ProviderType, "custom">, any> = {
   gmail: {
     clientId:
-      "757122969965-h4i287jiv8n5d6jbaergafq3ddki132e.apps.googleusercontent.com",
+      "36730104363-751i7av8q3dskom7rrirst9kfai98toc.apps.googleusercontent.com",
     scope:
       "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email",
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",

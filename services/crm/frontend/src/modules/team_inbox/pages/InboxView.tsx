@@ -2,13 +2,13 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../../../auth/AuthProvider';
 import { ConversationList } from './ConversationList';
 import { ConversationView } from './ConversationView';
-import { ContactPanel } from './ContactPanel';
 import { EmailComposer } from './EmailComposer';
 import TeammatesPage from './teammate/TeammatesPage';
 import { Sidebar } from './Sidebar';
 import { SharedInboxManager } from './shared-inbox/SharedInboxManager';
-import { Conversation, Contact, Message, SharedInbox } from '../types';
-import { mockSharedInboxes } from '../data/mockData';
+import { Conversation, Contact, SharedInbox } from '../types';
+import { Teammate } from '../types/teammate';
+
 import toast, { Toaster } from 'react-hot-toast';
 
 import { Plus, RefreshCw, Settings, Filter } from 'lucide-react';
@@ -39,6 +39,7 @@ export function InboxView() {
   const [sharedInboxes, setSharedInboxes] = useState<SharedInbox[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [teammember, setTeammember] = useState<Teammate[]>([]);
 
   const ws = useRef<WebSocket | null>(null);
   const hasConnected = useRef(false);
@@ -56,7 +57,6 @@ export function InboxView() {
     ws.current = new WebSocket(wsUrl);
 
     ws.current.onopen = () => {
-      console.log('✅ WebSocket connected:', wsUrl);
       setTimeout(() => {
         ws.current?.send(JSON.stringify({ message: 'Hello from frontend!' }));
       }, 100);
@@ -73,7 +73,6 @@ export function InboxView() {
     ws.current.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log('📩 New WebSocket message:', data);
 
         // --- Handle new conversation ---
         if (data.type === 'new_conversation' && data.message?.conversation) {
@@ -95,16 +94,13 @@ export function InboxView() {
 
           toast.success(`✉️ New message from ${msg.from?.email || 'someone'}`, { duration: 5000 });
 
-        } else {
-          console.log('ℹ️ Unhandled message type:', data.type);
-        }
+        } 
       } catch (err) {
         console.error('❌ Failed to parse WebSocket message:', err, event.data);
       }
     };
 
     return () => {
-      console.log('🔌 Closing WebSocket connection');
       ws.current?.close();
       hasConnected.current = false; // allow reconnect on tenant change
     };
@@ -121,7 +117,7 @@ export function InboxView() {
           `http://localhost:8000/api/inbox/conversations/?tenantId=${tenant.id}`,
           {
             headers: {
-              Authorization: `Bearer ${tokens.access_token}`,
+              Authorization: `Bearer ${tokens?.access_token}`,
               'Content-Type': 'application/json',
             },
           }
@@ -178,6 +174,77 @@ export function InboxView() {
 
 
 
+    useEffect(() => {
+      if (!tenant?.id || !tokens) return;
+  
+      const fetchTeammates = async () => {
+        setLoading(true);
+        try {
+          console.log("Fetching teammates for tenant:", tenant.id);
+          const res = await fetch(`http://localhost:8000/api/inbox/teammates/?tenant_id=${tenant.id}`, {
+            headers: {
+              Authorization: `Bearer ${tokens.access_token}`,
+              "Content-Type": "application/json",
+            },
+          });
+  
+          if (!res.ok) {
+            console.error("Failed response:", res.status, res.statusText);
+            throw new Error("Failed to fetch teammates");
+          }
+  
+          const data = await res.json().catch(err => {
+            console.error("Failed to parse JSON:", err);
+            return [];
+          });
+  
+          const formatted: Teammate[] = (data.results || []).map((item: any) => ({
+            id: item.id,
+            firstName: item.firstName || "",
+            lastName: item.lastName || "",
+            fullName: item.fullName || `${item.firstName || ""} ${item.lastName || ""}`.trim(),
+            email: item.email,
+            role: item.role as 'Admin' | 'Agent' | 'Viewer',
+            avatar: item.avatar || "https://placehold.co/64x64",
+            status: item.status || "Inactive",  // backend already sends "Active"/"Inactive"
+            lastSeen: item.lastSeen || "Offline",
+            joinedDate: item.joinedDate || "",
+            teamInboxes: item.teamInboxes || [],
+          }));
+  
+  
+          setTeammember(formatted);
+        } catch (err) {
+          console.error("❌ Failed to fetch teammates", err);
+        } finally {
+          setLoading(false);
+        }
+      };
+  
+      fetchTeammates();
+    }, [tenant, tokens]);
+  
+  
+
+  const menuCounts = useMemo(() => {
+    return {
+      inbox: conversations.filter((c) => !c.isArchived).length,
+      "teammates": teammember.length,
+      unassigned: conversations.filter((c) => !c.assignedTo).length,
+      "assigned-to-me": conversations.filter(
+        (c) => c.assignedTo === user?.full_name
+      ).length,
+      snoozed: conversations.filter((c) => c.snoozed).length,
+      sent: conversations.filter((c) =>
+        c.messages.some((m) => m.from.email === user?.email)
+      ).length,
+      archived: conversations.filter((c) => c.isArchived).length,
+    };
+  }, [conversations, user?.email, user?.full_name]);
+
+
+  
+
   const filteredConversations = useMemo(() => {
     return conversations.filter((conv) => {
       switch (sidebarFilter) {
@@ -201,7 +268,6 @@ export function InboxView() {
 
   const handleSendEmail = async (emailData: EmailData) => {
     try {
-      const isNewConversation = !emailData.threadId;
       const threadId = emailData.threadId || uuidv4();
 
       const payload = {
@@ -227,7 +293,7 @@ export function InboxView() {
       const res = await fetch('http://localhost:8000/api/inbox/messages/', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${tokens.access_token}`,
+          Authorization: `Bearer ${tokens?.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
@@ -238,9 +304,6 @@ export function InboxView() {
         return;
       }
 
-      const data = await res.json(); // Expecting backend to return { message, conversation }
-
-      console.log('Message + conversation from backend:', data);
 
       setShowComposer(false);
     } catch (error) {
@@ -254,26 +317,6 @@ export function InboxView() {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     setIsRefreshing(false);
   };
-
-
-  const handleReply = (data: any) => {
-
-    // Update this conversation in the UI
-    setConversations(prev =>
-      prev.map(conv =>
-        conv.threadId === data.message.threadId
-          ? {
-            ...conv,
-            messages: [...conv.messages, data.message],
-            lastMessage: data.message,
-            lastActivity: new Date(data.message.timestamp),
-            updatedAt: new Date(data.message.timestamp),
-          }
-          : conv
-      )
-    );
-  };
-
 
 
   const handleReplys = (data: any) => {
@@ -317,15 +360,17 @@ export function InboxView() {
         activeFilter={sidebarFilter}
         onFilterChange={setSidebarFilter}
         currentView="inbox"
-        onViewChange={() => { }}
+        onViewChange={() => {}}
         onCreateInbox={() => setShowSharedInboxManager(true)}
         sharedInboxes={sharedInboxesWithCounts}
+        menuCounts={menuCounts}
       />
 
-      {/* 👇 Only show TeammatesPage when filter is "Teammates" */}
+      {/*  Only show TeammatesPage when filter is "Teammates" */}
       {sidebarFilter === 'teammates' ? (
         <TeammatesPage
           sharedInboxes={sharedInboxes}
+          teammember={teammember}
         />
       ) : (
         <div className="flex-1 flex overflow-hidden">
@@ -382,14 +427,24 @@ export function InboxView() {
             />
           </div>
 
-          <div className="flex-1 flex">
-            <ConversationView
-              conversation={selectedConversation}
-              onContactSelect={setSelectedContact}
-              onReply={(emailData) => handleReply(emailData)}
-            />
-            {/* <ContactPanel contact={selectedContact} /> */}
-          </div>
+
+          
+        {/* Main Content Area */}
+        <div className="flex-1 flex">
+          <ConversationView
+            conversation={selectedConversation}
+            onContactSelect={setSelectedContact}
+            onSendEmail={handleSendEmail}
+            onUpdateConversation={(updatedConversation) => {
+              setConversations(prev => 
+                prev.map(conv => 
+                  conv.id === updatedConversation.id ? updatedConversation : conv
+                )
+              );
+              setSelectedConversation(updatedConversation);
+            }}
+          />
+        </div>
         </div>
       )}
 

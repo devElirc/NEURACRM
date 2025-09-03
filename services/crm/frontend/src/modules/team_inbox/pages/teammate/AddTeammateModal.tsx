@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, UserPlus, Send, CheckCircle } from 'lucide-react';
 import { NewTeammate } from '../../types/teammate';
 import { SharedInbox } from '../../types';

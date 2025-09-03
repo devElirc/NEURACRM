@@ -1,7 +1,7 @@
 import React from 'react';
 import { formatDistanceToNow } from '../utils/dateUtils';
 import { Conversation } from '../types';
-import { Paperclip, User, Clock, AlertTriangle } from 'lucide-react';
+import { Paperclip, UserCheck, Clock, AlertTriangle } from 'lucide-react';
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -35,20 +35,7 @@ export function ConversationList({
 
   return (
     <div className="w-96 h-screen flex flex-col bg-white border-r border-gray-200">
-      <div className="p-4 border-b border-gray-200 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Conversations</h2>
-          <div className="text-sm text-gray-500">{conversations.length} total</div>
-        </div>
 
-        <div className="mt-3">
-          <input
-            type="text"
-            placeholder="Search conversations..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-      </div>
 
       <div
         className="flex-grow overflow-y-auto pb-4"
@@ -93,8 +80,10 @@ export function ConversationList({
                 <div className="flex items-center space-x-2">
                   {conversation.assignedTo ? (
                     <div className="flex items-center space-x-1">
-                      <User className="h-3 w-3 text-gray-400" />
-                      <span className="text-xs text-gray-500">{conversation.assignedTo}</span>
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+                        <UserCheck className="w-3 h-3 mr-1" />
+                        {conversation.assignedTo}
+                      </span>
                     </div>
                   ) : (
                     <span className="text-xs text-orange-500">Unassigned</span>

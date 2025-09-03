@@ -323,11 +323,11 @@ UNFOLD = {
 # Google OAuth Settings
 GOOGLE_CLIENT_ID = os.getenv(
     "GOOGLE_CLIENT_ID",
-    "757122969965-h4i287jiv8n5d6jbaergafq3ddki132e.apps.googleusercontent.com",
+    "36730104363-751i7av8q3dskom7rrirst9kfai98toc.apps.googleusercontent.com",
 )
 GOOGLE_CLIENT_SECRET = os.getenv(
     "GOOGLE_CLIENT_SECRET",
-    "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",
+    "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",
 )
 GOOGLE_REDIRECT_URI = os.getenv(
     "GOOGLE_REDIRECT_URI",

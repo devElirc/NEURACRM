@@ -1,31 +1,28 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState } from 'react';
 import { UserPlus, Search, Users, Settings, Filter } from 'lucide-react';
 import TeammateCard from './TeammateCard';
 import AddTeammateModal from './AddTeammateModal';
 import EditTeammateModal from './EditTeammateModal';
-import ConfirmationModal from './ConfirmationModal'
+import ConfirmationModal from './ConfirmationModal';
 
-import { mockTeammates, mockTeamInboxes } from '../../data/mockData';
 import { Teammate, NewTeammate } from '../../types/teammate';
 import { SharedInbox } from '../../types';
 import { useAuth } from '../../../../auth/AuthProvider';
 
-
 type TeammatesPageProps = {
   sharedInboxes: SharedInbox[];
+  teammember: Teammate[];
 };
 
-
-const TeammatesPage: React.FC<TeammatesPageProps> = ({ sharedInboxes }) => {
-  const [teammates, setTeammates] = useState<Teammate[]>([]);
+const TeammatesPage: React.FC<TeammatesPageProps> = ({ sharedInboxes, teammember }) => {
+  const [teammates, setTeammates] = useState<Teammate[]>(teammember);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingTeammate, setEditingTeammate] = useState<Teammate | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState<string>('all');
-  const { user, tokens, tenant } = useAuth();
-  const [loading, setLoading] = useState(false);
-  
+  const { tokens, tenant } = useAuth();
+
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -36,71 +33,16 @@ const TeammatesPage: React.FC<TeammatesPageProps> = ({ sharedInboxes }) => {
     isOpen: false,
     title: '',
     message: '',
-    onConfirm: () => { },
-    isLoading: false
+    onConfirm: () => {},
+    isLoading: false,
   });
-
-
-  useEffect(() => {
-    if (!tenant?.id || !tokens) return;
-
-    const fetchTeammates = async () => {
-      setLoading(true);
-      try {
-        console.log("Fetching teammates for tenant:", tenant.id);
-        const res = await fetch(`http://localhost:8000/api/inbox/teammates/?tenant_id=${tenant.id}`, {
-          headers: {
-            Authorization: `Bearer ${tokens.access_token}`,
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (!res.ok) {
-          console.error("Failed response:", res.status, res.statusText);
-          throw new Error("Failed to fetch teammates");
-        }
-
-        const data = await res.json().catch(err => {
-          console.error("Failed to parse JSON:", err);
-          return [];
-        });
-
-        console.log("Raw data from backend:", data);
-
-        const formatted: Teammate[] = (data.results || []).map((item: any) => ({
-          id: item.id,
-          firstName: item.firstName || "",
-          lastName: item.lastName || "",
-          fullName: item.fullName || `${item.firstName || ""} ${item.lastName || ""}`.trim(),
-          email: item.email,
-          role: item.role as 'Admin' | 'Agent' | 'Viewer',
-          avatar: item.avatar || "https://placehold.co/64x64",
-          status: item.status || "Inactive",  // backend already sends "Active"/"Inactive"
-          lastSeen: item.lastSeen || "Offline",
-          joinedDate: item.joinedDate || "",
-          teamInboxes: item.teamInboxes || [],
-        }));
-
-
-        console.log("Formatted teammates:", formatted);
-        setTeammates(formatted);
-      } catch (err) {
-        console.error("❌ Failed to fetch teammates", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTeammates();
-  }, [tenant, tokens]);
-
 
   const handleAddTeammate = async (newTeammateData: NewTeammate, sendInvite: boolean) => {
     try {
       const payload = {
         ...newTeammateData,
         tenant_id: tenant?.id,
-        sendInvite,  // 👈 pass invite flag to backend
+        sendInvite,
         avatar: `https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=400`,
         status: 'Active',
         lastSeen: 'Just now',
@@ -110,8 +52,6 @@ const TeammatesPage: React.FC<TeammatesPageProps> = ({ sharedInboxes }) => {
           year: 'numeric',
         }),
       };
-
-      console.log("👉 Sending teammate to API:", payload);
 
       const response = await fetch('http://localhost:8000/api/inbox/teammates/', {
         method: 'POST',
@@ -128,16 +68,12 @@ const TeammatesPage: React.FC<TeammatesPageProps> = ({ sharedInboxes }) => {
       }
 
       const savedTeammate: Teammate = await response.json();
-      console.log("✅ API returned:", savedTeammate);
-
       setTeammates((prev) => [savedTeammate, ...prev]);
     } catch (error) {
       console.error('❌ Failed to add teammate:', error);
       alert('Failed to add teammate. Check console for details.');
     }
   };
-
-
 
   const handleEditTeammate = (teammate: Teammate) => {
     setEditingTeammate(teammate);
@@ -146,12 +82,10 @@ const TeammatesPage: React.FC<TeammatesPageProps> = ({ sharedInboxes }) => {
 
   const handleSaveTeammate = async (updatedTeammate: Teammate) => {
     try {
-      console.log("👉 Sending update to API:", updatedTeammate);
-
       const response = await fetch(
         `http://localhost:8000/api/inbox/teammates/${updatedTeammate.id}/`,
         {
-          method: 'PATCH', // PATCH for partial updates, PUT for full replacement
+          method: 'PATCH',
           headers: {
             Authorization: `Bearer ${tokens?.access_token}`,
             'Content-Type': 'application/json',
@@ -169,35 +103,22 @@ const TeammatesPage: React.FC<TeammatesPageProps> = ({ sharedInboxes }) => {
       }
 
       const savedTeammate: Teammate = await response.json();
-      console.log("✅ API returned updated teammate:", savedTeammate);
 
-      // Update local state with server response
       setTeammates((prev) =>
-        prev.map((teammate) =>
-          teammate.id === savedTeammate.id ? savedTeammate : teammate
-        )
+        prev.map((teammate) => (teammate.id === savedTeammate.id ? savedTeammate : teammate))
       );
 
       setEditingTeammate(null);
       setIsEditModalOpen(false);
     } catch (error) {
-      console.error("❌ Failed to update teammate:", error);
-      alert("Failed to update teammate. Check console for details.");
+      console.error('❌ Failed to update teammate:', error);
+      alert('Failed to update teammate. Check console for details.');
     }
   };
 
-
-  // --- remove teammate flow ---
   const handleRemoveTeammate = (id: string) => {
-    console.log("🟡 handleRemoveTeammate called with id:", id);
-
-    const teammate = teammates.find(t => t.id === id);
-    if (!teammate) {
-      console.warn("⚠️ No teammate found with id:", id);
-      return;
-    }
-
-    console.log("🟡 Opening confirmation modal for teammate:", teammate);
+    const teammate = teammates.find((t) => t.id === id);
+    if (!teammate) return;
 
     setConfirmModal({
       isOpen: true,
@@ -205,18 +126,14 @@ const TeammatesPage: React.FC<TeammatesPageProps> = ({ sharedInboxes }) => {
       message: `Are you sure you want to remove ${teammate.fullName || teammate.email} from your team? 
               This action cannot be undone and they will lose access to all team inboxes.`,
       onConfirm: () => confirmRemoveTeammate(id),
-      isLoading: false
+      isLoading: false,
     });
   };
 
   const confirmRemoveTeammate = async (id: string) => {
-    console.log("🟡 confirmRemoveTeammate triggered for id:", id);
-
-    setConfirmModal(prev => ({ ...prev, isLoading: true }));
+    setConfirmModal((prev) => ({ ...prev, isLoading: true }));
 
     try {
-      console.log("👉 Sending DELETE request to API:", `http://localhost:8000/api/inbox/teammates/${id}/`);
-
       const response = await fetch(`http://localhost:8000/api/inbox/teammates/${id}/`, {
         method: 'DELETE',
         headers: {
@@ -225,56 +142,36 @@ const TeammatesPage: React.FC<TeammatesPageProps> = ({ sharedInboxes }) => {
         },
       });
 
-      console.log("📡 API response status:", response.status);
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("❌ API responded with error:", errorText);
         throw new Error(`API error: ${errorText}`);
       }
 
-      console.log("✅ API DELETE success. Removing teammate from state...");
+      setTeammates((prev) => prev.filter((teammate) => teammate.id !== id));
 
-      // Update local state
-      setTeammates(prev => {
-        const updated = prev.filter(teammate => teammate.id !== id);
-        console.log("🟢 Updated teammates list:", updated);
-        return updated;
-      });
-
-      // Close modal
-      console.log("🟢 Closing modal after success");
-      setConfirmModal(prev => ({ ...prev, isOpen: false, isLoading: false }));
+      setConfirmModal((prev) => ({ ...prev, isOpen: false, isLoading: false }));
     } catch (error) {
-      console.error("❌ Failed to delete teammate:", error);
-
-      alert("Failed to remove teammate. Check console for details.");
-
-      // Reset loading state, but keep modal open so user can retry or cancel
-      setConfirmModal(prev => ({ ...prev, isLoading: false }));
+      console.error('❌ Failed to delete teammate:', error);
+      alert('Failed to remove teammate. Check console for details.');
+      setConfirmModal((prev) => ({ ...prev, isLoading: false }));
     }
   };
 
-
   const filteredTeammates = teammates.filter((teammate) => {
-    console.log("teammates", teammates);
-
-    const fullName =
-      `${teammate.firstName || ''} ${teammate.lastName || ''}`.trim().toLowerCase();
-
+    const fullName = `${teammate.firstName || ''} ${teammate.lastName || ''}`
+      .trim()
+      .toLowerCase();
     const email = teammate.email?.toLowerCase() || '';
 
     const matchesSearch =
-      fullName.includes(searchQuery.toLowerCase()) ||
-      email.includes(searchQuery.toLowerCase());
+      fullName.includes(searchQuery.toLowerCase()) || email.includes(searchQuery.toLowerCase());
 
     const matchesRole = filterRole === 'all' || teammate.role === filterRole;
 
     return matchesSearch && matchesRole;
   });
 
-
-  const activeTeammates = teammates.filter(t => t.status === 'Active').length;
+  const activeTeammates = teammates.filter((t) => t.status === 'Active').length;
   const totalTeammates = teammates.length;
 
   return (
@@ -336,7 +233,7 @@ const TeammatesPage: React.FC<TeammatesPageProps> = ({ sharedInboxes }) => {
               <div>
                 <p className="text-sm font-medium text-gray-600">Admin Users</p>
                 <p className="text-3xl font-bold text-purple-600">
-                  {teammates.filter(t => t.role === 'Admin').length}
+                  {teammates.filter((t) => t.role === 'Admin').length}
                 </p>
               </div>
               <div className="p-3 bg-purple-100 rounded-lg">
@@ -377,7 +274,7 @@ const TeammatesPage: React.FC<TeammatesPageProps> = ({ sharedInboxes }) => {
 
         {/* Teammates Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredTeammates.map(teammate => (
+          {filteredTeammates.map((teammate) => (
             <TeammateCard
               key={teammate.id}
               teammate={teammate}
@@ -415,7 +312,7 @@ const TeammatesPage: React.FC<TeammatesPageProps> = ({ sharedInboxes }) => {
 
       <ConfirmationModal
         isOpen={confirmModal.isOpen}
-        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onClose={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
         onConfirm={confirmModal.onConfirm}
         title={confirmModal.title}
         message={confirmModal.message}

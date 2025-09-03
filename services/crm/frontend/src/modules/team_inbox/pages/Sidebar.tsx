@@ -21,18 +21,47 @@ import {
 import { useNavigate } from 'react-router-dom';
 
 
+// interface SidebarProps {
+//   activeFilter: string;
+//   onFilterChange: (filter: string) => void;
+//   currentView: 'home' | 'dashboard' | 'inbox';
+//   onCreateInbox?: () => void;
+//   onViewChange: (view: 'home' | 'dashboard' | 'inbox') => void;
+//   sharedInboxes?: Array<{ id: string; name: string; unreadCount: number }>;
+
+// }
+
+
+// interface SidebarProps {
+//   activeFilter: string;
+//   onFilterChange: (filter: string) => void;
+//   currentView: 'home' | 'dashboard' | 'inbox';
+//   onCreateInbox?: () => void;
+//   onViewChange: (view: 'home' | 'dashboard' | 'inbox') => void;
+//   sharedInboxes?: Array<{ id: string; name: string; unreadCount: number }>;
+
+//   counts?: {
+//     inbox?: number;
+//     unassigned?: number;
+//     assignedToMe?: number;
+//     snoozed?: number;
+//     archived?: number;
+//     sent?: number;
+//   };
+// }
+
 interface SidebarProps {
   activeFilter: string;
   onFilterChange: (filter: string) => void;
-  currentView: 'home' | 'dashboard' | 'inbox';
+  currentView: "home" | "dashboard" | "inbox";
   onCreateInbox?: () => void;
-  onViewChange: (view: 'home' | 'dashboard' | 'inbox') => void;
+  onViewChange: (view: "home" | "dashboard" | "inbox") => void;
   sharedInboxes?: Array<{ id: string; name: string; unreadCount: number }>;
-
+  menuCounts: Record<string, number>; 
 }
 
 export function Sidebar({ activeFilter, onFilterChange, currentView, onCreateInbox,
-  onViewChange, sharedInboxes = []
+  onViewChange, sharedInboxes = [],  menuCounts
 }: SidebarProps) {
   const { user, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
@@ -44,15 +73,17 @@ export function Sidebar({ activeFilter, onFilterChange, currentView, onCreateInb
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3, view: 'dashboard' as const },
   ];
 
+
   const menuItems = [
-    { id: 'inbox', label: 'Inbox', icon: Inbox, count: 12 },
-    { id: 'teammates', label: 'Teammates', icon: Users },
-    { id: 'unassigned', label: 'Unassigned', icon: UserX, count: 3 },
-    { id: 'assigned-to-me', label: 'Assigned to Me', icon: UserCheck, count: 5 },
-    { id: 'snoozed', label: 'Snoozed', icon: Clock, count: 2 },
-    { id: 'sent', label: 'Sent', icon: Send },
-    { id: 'archived', label: 'Archived', icon: Archive },
+    { id: "inbox", label: "Inbox", icon: Inbox, count: menuCounts.inbox },
+    { id: "teammates", label: "Teammates", icon: Users, count: menuCounts.teammates },
+    { id: "unassigned", label: "Unassigned", icon: UserX, count: menuCounts.unassigned },
+    { id: "assigned-to-me", label: "Assigned to Me", icon: UserCheck, count: menuCounts["assigned-to-me"] },
+    { id: "snoozed", label: "Snoozed", icon: Clock, count: menuCounts.snoozed },
+    { id: "sent", label: "Sent", icon: Send, count: menuCounts.sent },
+    { id: "archived", label: "Archived", icon: Archive, count: menuCounts.archived },
   ];
+
 
   const tags = [
     { id: 'billing', label: 'Billing', color: 'bg-blue-500' },
@@ -61,6 +92,8 @@ export function Sidebar({ activeFilter, onFilterChange, currentView, onCreateInb
     { id: 'urgent', label: 'Urgent', color: 'bg-red-500' },
     { id: 'follow-up', label: 'Follow-up', color: 'bg-orange-500' },
   ];
+
+
 
   useEffect(() => {
     const prevAuth = prevAuthRef.current;
@@ -138,12 +171,10 @@ export function Sidebar({ activeFilter, onFilterChange, currentView, onCreateInb
                   <Icon className="h-4 w-4" />
                   <span>{item.label}</span>
                 </div>
-                {item.count && (
                   <span className={`px-2 py-1 text-xs rounded-full ${isActive ? 'bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200' : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
                     }`}>
                     {item.count}
                   </span>
-                )}
               </button>
             );
           })}

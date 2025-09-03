@@ -3,24 +3,6 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
-# class TeamMember(models.Model):
-#     """
-#     Team member linking user to tenant with role
-#     """
-#     ROLE_CHOICES = [
-#         ('admin', 'Admin'),
-#         ('agent', 'Agent'),
-#         ('viewer', 'Viewer'),
-#     ]
-
-#     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-#     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='tenant_memberships')
-#     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
-#     is_active = models.BooleanField(default=True)
-
-#     def __str__(self):
-#         return f"{self.user.email} ({self.role})"
-
 
 class TeamMember(models.Model):
     """
@@ -55,7 +37,7 @@ class Inbox(models.Model):
     # removed email, since "channels" will carry identifiers now
     
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)  # ✅ frontend expects updatedAt
+    updated_at = models.DateTimeField(auto_now=True)  
 
     def __str__(self):
         return f"{self.name}"
@@ -138,20 +120,8 @@ class Conversation(models.Model):
     participants = models.JSONField(default=list)  # List of { name, email }
     tags = models.ManyToManyField('Tag', blank=True, related_name='conversations')
 
-    assigned_to = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name='assigned_conversations'
-    )
-    assigned_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name='assigned_by_conversations'
-    )
+    assigned_to = models.CharField(max_length=255, null=True, blank=True)
+    assigned_by = models.CharField(max_length=255, null=True, blank=True)
     assigned_at = models.DateTimeField(null=True, blank=True)
 
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='open')
@@ -279,15 +249,6 @@ class InternalNote(models.Model):
         return f'Note by {self.author} on {self.created_at}'
 
 
-# class Comment(models.Model):
-#     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-#     message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name='comments')
-#     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-#     content = models.TextField()
-#     created_at = models.DateTimeField(auto_now_add=True)
-
-#     def __str__(self):
-#         return f"Comment by {self.user.email} on {self.message.subject}"
 
 
 class Comment(models.Model):

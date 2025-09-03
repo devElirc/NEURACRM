@@ -15,11 +15,21 @@ import { Button } from './ui/Button';
 
 interface InlineReplyComposerProps {
   onSend: (content: string) => void;
+  onSendReplyAll?: (content: string) => void;
   onCancel: () => void;
-  replyTo: Message;
+  replyTo?: Message;
+  placeholder?: string;
+  showReplyAllButton?: boolean;
 }
 
-export function InlineReplyComposer({ onSend, onCancel, replyTo }: InlineReplyComposerProps) {
+export function InlineReplyComposer({ 
+  onSend, 
+  onSendReplyAll, 
+  onCancel, 
+  replyTo, 
+  placeholder = "Write your reply...",
+  showReplyAllButton = false 
+}: InlineReplyComposerProps) {
   const { user } = useAuth();
   const [content, setContent] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -41,9 +51,26 @@ export function InlineReplyComposer({ onSend, onCancel, replyTo }: InlineReplyCo
 
     setIsSending(true);
     try {
-      await onSend(content);
+      onSend(content);
+      setContent('');
+      setAttachments([]);
     } catch (error) {
       console.error('Failed to send reply:', error);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleSendReplyAll = async () => {
+    if (!content.trim() || !onSendReplyAll) return;
+
+    setIsSending(true);
+    try {
+      onSendReplyAll(content);
+      setContent('');
+      setAttachments([]);
+    } catch (error) {
+      console.error('Failed to send reply all:', error);
     } finally {
       setIsSending(false);
     }
@@ -79,7 +106,7 @@ export function InlineReplyComposer({ onSend, onCancel, replyTo }: InlineReplyCo
             </span>
           </div>
           <span className="text-sm font-medium text-gray-900 dark:text-white">
-            Replying to {replyTo.from.name || replyTo.from.email}
+            {replyTo ? `Replying to ${replyTo.from.name || replyTo.from.email}` : 'New message'}
           </span>
         </div>
         <button
@@ -149,7 +176,7 @@ export function InlineReplyComposer({ onSend, onCancel, replyTo }: InlineReplyCo
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Write your reply..."
+          placeholder={placeholder}
           className="w-full px-0 py-0 border-0 text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-0 bg-transparent text-gray-900 dark:text-white resize-none min-h-[80px] max-h-48"
           rows={3}
         />
@@ -164,6 +191,18 @@ export function InlineReplyComposer({ onSend, onCancel, replyTo }: InlineReplyCo
           <Button variant="ghost" size="sm" onClick={onCancel}>
             Cancel
           </Button>
+          {showReplyAllButton && onSendReplyAll && (
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={handleSendReplyAll}
+              disabled={!content.trim() || isSending}
+              isLoading={isSending}
+            >
+              <Send className="w-4 h-4 mr-2" />
+              Reply All
+            </Button>
+          )}
           <Button 
             size="sm" 
             onClick={handleSend}
@@ -171,7 +210,7 @@ export function InlineReplyComposer({ onSend, onCancel, replyTo }: InlineReplyCo
             isLoading={isSending}
           >
             <Send className="w-4 h-4 mr-2" />
-            Send Reply
+            {showReplyAllButton ? 'Reply' : 'Send Reply'}
           </Button>
         </div>
       </div>

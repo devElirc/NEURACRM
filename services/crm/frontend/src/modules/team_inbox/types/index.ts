@@ -72,14 +72,42 @@ export interface EmailAccount {
   lastSync?: Date;
 }
 
+
+
+// export interface Message {
+//   id: string;
+//   threadId: string;
+//   from: EmailAddress;
+//   to: EmailAddress[];
+//   cc?: EmailAddress[];
+//   bcc?: EmailAddress[];
+//   replyTo?: EmailAddress;
+//   subject: string;
+//   content: string;
+//   htmlContent?: string;
+//   timestamp: Date;
+//   isRead: boolean;
+//   isStarred: boolean;
+//   isDraft: boolean;
+//   messageId: string; // Email message ID
+//   inReplyTo?: string;
+//   references?: string[];
+//   attachments?: Attachment[];
+//   internalNotes?: InternalNote[];
+//   labels: Label[];
+//   priority: 'low' | 'normal' | 'high' | 'urgent';
+//   source: 'incoming' | 'outgoing' | 'internal';
+// }
+
+
 export interface Message {
   id: string;
   threadId: string;
+  messageId: string;
   from: EmailAddress;
   to: EmailAddress[];
   cc?: EmailAddress[];
   bcc?: EmailAddress[];
-  replyTo?: EmailAddress;
   subject: string;
   content: string;
   htmlContent?: string;
@@ -87,14 +115,13 @@ export interface Message {
   isRead: boolean;
   isStarred: boolean;
   isDraft: boolean;
-  messageId: string; // Email message ID
-  inReplyTo?: string;
-  references?: string[];
-  attachments?: Attachment[];
-  internalNotes?: InternalNote[];
-  labels: Label[];
+  attachments: Attachment[];
+  comments: Comment[];
+  labels: string[];
   priority: 'low' | 'normal' | 'high' | 'urgent';
-  source: 'incoming' | 'outgoing' | 'internal';
+  source: 'incoming' | 'outgoing';
+  inReplyTo?: string;
+
 }
 
 export interface EmailAddress {
@@ -155,8 +182,7 @@ export interface Attachment {
   isInline: boolean;
 }
 
-export interface 
-InternalNote {
+export interface InternalNote {
   id: string;
   conversationId: string;
   author: User;
@@ -427,4 +453,17 @@ export interface TeamMember {
 export interface Permission {
   action: 'read' | 'reply' | 'assign' | 'admin';
   granted: boolean;
+}
+
+export interface EmailData {
+  to: string[];
+  cc: string[];
+  bcc: string[];
+  subject: string;
+  content: string;
+  htmlContent: string;
+  attachments: File[];
+  isReply: boolean;
+  threadId?: string;
+  sharedInboxId?: string;
 }

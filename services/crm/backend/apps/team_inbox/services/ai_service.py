@@ -8,30 +8,40 @@ class AIService:
     """
     def __init__(self):
         # Use Django settings or hardcode your key
-        self.client = OpenAI(api_key=getattr(settings, "OPENAI_API_KEY", "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"))
+        self.client = OpenAI(api_key=getattr(settings, "OPENAI_API_KEY", "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"))
 
     def generate_reply(self, conversation_messages, settings_dict):
         """
-        conversation_messages: list of all messages (strings)
-        settings_dict: {tone: 'professional', length: 'medium'}
+        Generate an AI reply based on conversation history and settings.
+
+        Args:
+            conversation_messages (list[str]): All messages in the conversation.
+            settings_dict (dict): Settings like {"tone": "professional", "length": "medium"}.
+
+        Returns:
+            dict: Structured AI reply with content, confidence, suggestions, and reasoning.
         """
-        tone = settings_dict.get('tone', 'professional')
-        length = settings_dict.get('length', 'medium')
+        tone = settings_dict.get("tone", "professional")
+        length = settings_dict.get("length", "medium")
 
         # Build conversation context
-        conversation_text = "\n".join([f"Customer: {msg}" for msg in conversation_messages])
+        conversation_text = "\n".join(
+            [f"Customer: {msg}" for msg in conversation_messages]
+        )
+
         prompt = f"""
-You are a helpful customer support AI. Reply professionally.
-Conversation context:
-{conversation_text}
+        You are a helpful customer support AI. Reply professionally.
 
-Requirements:
-- Tone: {tone}
-- Length: {length}
-- Provide a concise and helpful response
-"""
+        Conversation context:
+        {conversation_text}
 
-        # Call new API
+        Requirements:
+        - Tone: {tone}
+        - Length: {length}
+        - Provide a concise and helpful response.
+        """
+
+        # Call OpenAI API
         response = self.client.chat.completions.create(
             model="gpt-4o-mini",  # or "gpt-4o"
             messages=[
@@ -52,5 +62,7 @@ Requirements:
                 "Add a personal touch by mentioning their name",
                 "Include a follow-up question to ensure satisfaction",
             ],
-            "reasoning": "Generated based on full conversation context with requested tone and length."
+            "reasoning": "Generated based on full conversation context with requested tone and length.",
         }
+
+

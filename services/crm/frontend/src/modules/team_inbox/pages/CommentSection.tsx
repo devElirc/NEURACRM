@@ -1,18 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useAuth } from '../../../auth/AuthProvider';
-import { InternalNote, TeamMember } from '../types';
+import { Comment, TeamMember } from '../types';
 import { mockTeamMembers } from '../data/mockData';
 import {
   MessageSquare,
   Paperclip,
   Smile,
-  Image as ImageIcon,
   Send,
   X,
   ChevronDown,
   ChevronUp,
-  AtSign,
-  Hash,
   Bold,
   Italic,
   Link,
@@ -22,8 +18,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Button } from '../pages/ui/Button';
 
 interface CommentSectionProps {
-  conversationId: string;
-  comments: InternalNote[];
+  comments: Comment[];
   onAddComment: (content: string, attachments?: File[], mentions?: string[]) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
@@ -123,13 +118,11 @@ const MentionDropdown: React.FC<MentionDropdownProps> = ({ query, onSelect, onCl
 };
 
 export function CommentSection({
-  conversationId,
   comments,
   onAddComment,
   isCollapsed = false,
   onToggleCollapse
 }: CommentSectionProps) {
-  const { user } = useAuth();
   const [content, setContent] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -197,38 +190,13 @@ export function CommentSection({
     textareaRef.current?.focus();
   };
 
-  // const handleEmojiSelect = (emoji: string) => {
-  //   const textBeforeCursor = content.substring(0, cursorPosition);
-  //   const textAfterCursor = content.substring(cursorPosition);
-  //   const newContent = `${textBeforeCursor}${emoji}${textAfterCursor}`;
 
-  //   setContent(newContent);
-  //   setShowEmojiPicker(false);
-
-  //   // Focus back to textarea and set cursor position
-  //   setTimeout(() => {
-  //     if (textareaRef.current) {
-  //       textareaRef.current.focus();
-  //       const newCursorPos = cursorPosition + emoji.length;
-  //       textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
-  //       setCursorPosition(newCursorPos);
-  //     }
-  //   }, 0);
-  // };
 
   const handleEmojiSelect = (emoji: string) => {
-    console.log("➡️ Emoji selected:", emoji);
-    console.log("Current cursorPosition:", cursorPosition);
-    console.log("Current content:", content);
 
     const textBeforeCursor = content.substring(0, cursorPosition);
     const textAfterCursor = content.substring(cursorPosition);
-
-    console.log("Text before cursor:", textBeforeCursor);
-    console.log("Text after cursor:", textAfterCursor);
-
     const newContent = `${textBeforeCursor}${emoji}${textAfterCursor}`;
-    console.log("📝 New content after inserting emoji:", newContent);
 
     setContent(newContent);
     setShowEmojiPicker(false);
@@ -241,10 +209,7 @@ export function CommentSection({
         textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
         setCursorPosition(newCursorPos);
 
-        console.log("✅ Cursor updated to position:", newCursorPos);
-      } else {
-        console.warn("⚠️ textareaRef.current is null");
-      }
+      } 
     }, 0);
   };
 

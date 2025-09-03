@@ -2,13 +2,21 @@ import json
 import base64
 import requests
 import traceback
+import smtplib
+import html
+import re
+
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.utils import getaddresses
+from bs4 import BeautifulSoup
 
 from django.core.cache import cache
 from django.db import transaction
 from django.http import JsonResponse, HttpResponse
-
-from datetime import datetime as dt_datetime, timezone as dt_timezone
 from django.utils import timezone
+
+from datetime import datetime, timezone as dt_timezone
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -40,76 +48,62 @@ from ..serializers import (
 
 from email.utils import getaddresses
 
-
-from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.pagination import PageNumberPagination
-from rest_framework.filters import OrderingFilter, SearchFilter
 
 
 User = get_user_model()
 
 from ...core.models import TenantEmailMapping, Client  # adjust if needed
 
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+
 
 SMTP_SERVER = "mail.ralakde.co.uk"
 SMTP_PORT = 587
 SMTP_USER = "teams@ralakde.com"
 SMTP_PASS = "Ralakde123"
 
-
 def send_invitation_email(email: str, tenant_id: str, created: bool):
     if created:
         subject = "Welcome! Your account has been created"
         invite_link = "https://NeuraCRM.com/login"
         body = f"""
-        Hi,
+Hi,
 
-        An account has been created for you on NeuraCRM.
-        You can log in with the email {email} and the temporary password: 123456.
+An account has been created for you on NeuraCRM.
+You can log in with the email {email} and the temporary password: 123456.
 
-        Once logged in, please change your password immediately.
+Once logged in, please change your password immediately.
 
-        Login here: {invite_link}
+Login here: {invite_link}
 
-        Best regards,
-        NeuraCRM Team
-        """
+Best regards,
+NeuraCRM Team
+"""
     else:
         subject = "You've been added to a new team"
         invite_link = f"https://NeuraCRM.com/invite/accept?email={email}&tenant_id={tenant_id}"
         body = f"""
-        Hi,
+Hi,
 
-        You've been added to a new team on NeuraCRM.
-        Click below to accept and access the team:
+You've been added to a new team on NeuraCRM.
+Click below to accept and access the team:
 
-        {invite_link}
+{invite_link}
 
-        Best regards,
-        NeuraCRM Team
-        """
-
+Best regards,
+NeuraCRM Team
+"""
     print(f"📧 Sending invite to {email} (tenant={tenant_id}, created={created})")
-
-    # build MIME email
     msg = MIMEMultipart()
     msg["From"] = SMTP_USER
     msg["To"] = email
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "plain"))
 
-    # send via SMTP
     with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-        server.starttls()  # TLS for port 587
+        server.starttls()
         server.login(SMTP_USER, SMTP_PASS)
         server.sendmail(SMTP_USER, email, msg.as_string())
-
-
-# ---------------- GMAIL PUSH NOTIFICATION HANDLER ---------------- #
 
 
 def parse_email_subject_and_snippet(message):
@@ -137,7 +131,6 @@ def get_tenant_for_email(email: str):
 
 
 def refresh_access_token(channel_account):
-    """Refresh Gmail OAuth token using refresh_token."""
     response = requests.post("https://oauth2.googleapis.com/token", data={
         "client_id": settings.GOOGLE_CLIENT_ID,
         "client_secret": settings.GOOGLE_CLIENT_SECRET,
@@ -153,21 +146,89 @@ def refresh_access_token(channel_account):
     return channel_account.access_token
 
 
+def clean_gmail_html(html_body: str) -> str:
+    """Clean marketing/newsletter HTML and return compact plain text."""
+    soup = BeautifulSoup(html_body, "html.parser")
+
+    # --- Remove junk ---
+    for tag in soup(["style", "script", "meta", "title", "head", "noscript"]):
+        tag.decompose()
+
+    # Remove tracking pixels / invisible images
+    for img in soup.find_all("img", {"height": "1", "width": "1"}):
+        img.decompose()
+
+    # --- Replace structural tags with newlines ---
+    for br in soup.find_all("br"):
+        br.replace_with("\n")
+    for block in soup.find_all(["p", "div", "tr", "td", "section"]):
+        block.append("\n")
+
+    # --- Extract text ---
+    text = soup.get_text(separator=" ", strip=True)
+
+    # --- Normalize spacing ---
+    text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)  # collapse >2 blank lines
+    text = re.sub(r"[ \t]+", " ", text)           # collapse spaces
+    text = text.strip()
+
+    return text
+
+
+def html_to_clean_text(html_body: str) -> str:
+    """
+    Convert cleaned Gmail HTML into plain text
+    with controlled newlines (like Gmail does).
+    """
+    cleaned_html = clean_gmail_html(html_body)
+    soup = BeautifulSoup(cleaned_html, "html.parser")
+
+    text = soup.get_text("\n")
+
+    # Normalize line endings
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+
+    # Collapse 3+ newlines into exactly 2
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
+    # Strip trailing/leading newlines
+    return text.strip() + "\n"
+
+
+def preserve_gmail_format(plain_text: str) -> str:
+    escaped = html.escape(plain_text)
+    lines = escaped.splitlines()
+    formatted_lines = []
+    for line in lines:
+        if line.strip() == "":
+            formatted_lines.append("<br>")
+        else:
+            formatted_lines.append(line)
+    return "<br>\n".join(formatted_lines)
+
+
+# --- NEW helper: safe header extraction from Gmail payload headers list ---
+def get_header(headers_list, name: str):
+    """
+    Given Gmail's headers list (list of {"name": "...", "value": "..."})
+    return the value for header 'name' (case-insensitive), or None.
+    """
+    if not headers_list:
+        return None
+    for h in headers_list:
+        if h is None:
+            continue
+        if h.get("name", "").lower() == name.lower():
+            return h.get("value")
+    return None
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
+
 def gmail_notify(request):
-    """
-    Gmail Pub/Sub webhook handler:
-    - Decode Pub/Sub message
-    - Deduplicate events
-    - Fetch new emails via Gmail API
-    - Match/create conversation
-    - Save message and broadcast via WebSocket
-    """
     try:
         envelope = json.loads(request.body)
         message_data = envelope.get("message", {}).get("data")
-
         if not message_data:
             return JsonResponse({"error": "No message data"}, status=400)
 
@@ -175,60 +236,107 @@ def gmail_notify(request):
         incoming_history_id = payload.get("historyId")
         email = payload.get("emailAddress")
 
-        # 🔹 Deduplication guard (10s lock per email)
+        # Deduplication guard
         cache_key = f"gmail_webhook_lock:{email}"
         if cache.get(cache_key):
             return JsonResponse({"status": "duplicate_skipped"})
         cache.set(cache_key, True, timeout=10)
 
-        # 🔹 Resolve account + tenant
+        # Resolve account + tenant
         account = ChannelAccount.objects.get(identifier=email)
         tenant = get_tenant_for_email(email)
         if not tenant:
             return JsonResponse({"error": "Tenant not found"}, status=404)
 
         with schema_context(tenant.schema_name):
-            # Pick valid history ID
             history_id = incoming_history_id or account.last_history_id
             if not history_id:
                 return JsonResponse({"error": "Missing historyId"}, status=400)
 
-            # 🔹 Fetch new messages
             gmail = GmailService(account)
             messages, new_history_id = gmail.fetch_new_emails(history_id)
 
+            def extract_bodies(payload):
+                headers_list = payload.get("headers", []) or []
+                subject_for_debug = get_header(headers_list, "Subject")
+                from_for_debug = get_header(headers_list, "From")
+
+                html_body = None
+                plain_body = None
+
+                def walk(parts):
+                    for part in parts:
+                        if not isinstance(part, dict):
+                            continue
+                        mime = part.get("mimeType")
+                        body_data = part.get("body", {}).get("data")
+                        if part.get("parts"):
+                            yield from walk(part.get("parts"))
+                        elif body_data:
+                            try:
+                                decoded = base64.urlsafe_b64decode(body_data).decode("utf-8", errors="ignore")
+                            except Exception:
+                                try:
+                                    decoded = base64.b64decode(body_data).decode("utf-8", errors="ignore")
+                                except Exception:
+                                    decoded = ""
+                            yield mime, decoded
+
+                parts = payload.get("parts")
+                if parts:
+                    for mime, decoded in walk(parts):
+                        if not mime or not decoded:
+                            continue
+                        if mime.lower().split(";")[0] == "text/html" and not html_body:
+                            html_body = decoded
+                        elif mime.lower().split(";")[0] == "text/plain" and not plain_body:
+                            plain_body = decoded
+                else:
+                    body_data = payload.get("body", {}).get("data")
+                    if body_data:
+                        try:
+                            plain_body = base64.urlsafe_b64decode(body_data).decode("utf-8", errors="ignore")
+                        except Exception:
+                            plain_body = None
+
+                if html_body:
+                    # Clean HTML to preserve blank lines
+                    plain_body = html_to_clean_text(html_body)
+                elif plain_body:
+                    # fallback to text → HTML
+                    html_body = preserve_gmail_format(plain_body)
+
+                return html_body, plain_body
+
             for msg in messages:
                 subject, snippet = parse_email_subject_and_snippet(msg)
-                headers = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
-
-                msg_id = headers.get("Message-ID", msg["id"])
+                headers_list = msg.get("payload", {}).get("headers", []) or []
+                headers = {h.get("name", "").lower(): h.get("value") for h in headers_list if isinstance(h, dict)}
+                msg_id = headers.get("message-id") or msg.get("id")
                 if Message.objects.filter(message_id=msg_id).exists():
                     continue
 
-                # Email metadata
                 thread_id = msg.get("threadId")
-                in_reply_to = headers.get("In-Reply-To")
-                references = headers.get("References")
-                from_email = parse_email_address(headers.get("From"))
-                to = parse_email_list(headers.get("To"))
-                cc = parse_email_list(headers.get("Cc"))
-                bcc = parse_email_list(headers.get("Bcc"))
-                reply_to = parse_email_list(headers.get("Reply-To"))
-                timestamp = dt_datetime.fromtimestamp(
-                    int(msg.get("internalDate", 0)) / 1000.0, tz=dt_timezone.utc
-                )
+                in_reply_to = headers.get("in-reply-to")
+                references = headers.get("references")
+                from_email = parse_email_address(headers.get("from"))
+                to = parse_email_list(headers.get("to"))
+                cc = parse_email_list(headers.get("cc"))
+                bcc = parse_email_list(headers.get("bcc"))
+                reply_to = parse_email_list(headers.get("reply-to"))
+                timestamp = datetime.fromtimestamp(int(msg.get("internalDate", 0)) / 1000.0, tz=dt_timezone.utc)
 
-                # 🔹 Conversation matching
+                # Conversation matching
                 conversation = None
                 if thread_id:
                     conversation = Conversation.objects.filter(thread_id=thread_id).first()
                 if not conversation and in_reply_to:
                     conversation = Conversation.objects.filter(messages__message_id=in_reply_to).first()
                 if not conversation and references:
-                    ref_ids = [r.strip() for r in references.split()]
-                    conversation = Conversation.objects.filter(messages__message_id__in=ref_ids).first()
+                    ref_ids = [r.strip() for r in references.split()] if isinstance(references, str) else None
+                    if ref_ids:
+                        conversation = Conversation.objects.filter(messages__message_id__in=ref_ids).first()
 
-                # 🔹 Create conversation if none found
                 created = False
                 if not conversation:
                     conversation = Conversation.objects.create(
@@ -242,7 +350,9 @@ def gmail_notify(request):
                     )
                     created = True
 
-                # 🔹 Save message
+                payload_msg = msg.get("payload", {}) or {}
+                html_body, plain_body = extract_bodies(payload_msg)
+
                 message = Message.objects.create(
                     conversation=conversation,
                     message_id=msg_id,
@@ -255,20 +365,19 @@ def gmail_notify(request):
                     cc=cc or None,
                     bcc=bcc or None,
                     reply_to=reply_to[0] if reply_to else None,
-                    content=snippet,
-                    html_content=None,
+                    content=plain_body or snippet or "",
+                    html_content=html_body or preserve_gmail_format(plain_body or snippet or ""),
                     timestamp=timestamp,
                     inbox=account.inbox,
                     source="incoming",
                     priority="normal",
                 )
 
-                # Update conversation activity
                 conversation.last_activity = timestamp
                 conversation.last_message = message
                 conversation.save(update_fields=["last_activity", "last_message"])
 
-                # 🔹 WebSocket broadcast
+                # WebSocket broadcast
                 try:
                     channel_layer = get_channel_layer()
                     async_to_sync(channel_layer.group_send)(
@@ -285,7 +394,6 @@ def gmail_notify(request):
                 except Exception:
                     traceback.print_exc()
 
-            # 🔹 Update history_id
             if new_history_id:
                 account.last_history_id = new_history_id
                 account.save(update_fields=["last_history_id"])
@@ -295,7 +403,6 @@ def gmail_notify(request):
     except Exception as e:
         traceback.print_exc()
         return JsonResponse({"error": str(e)}, status=500)
-
 
 # ----------------- Outlook Webhook ----------------- #
 
@@ -309,7 +416,7 @@ def outlook_notify(request):
     - Broadcasts via WebSocket
     """
     try:
-        # 🔹 1. Validation handshake
+        # 1. Validation handshake
         validation_token = request.GET.get("validationToken")
         if validation_token:
             return HttpResponse(validation_token, content_type="text/plain", status=200)
@@ -327,13 +434,13 @@ def outlook_notify(request):
             if not subscription_id or not message_id:
                 continue
 
-            # 🔹 2. Deduplication
+            # 2. Deduplication
             cache_key = f"outlook_webhook_lock:{subscription_id}:{message_id}"
             if cache.get(cache_key):
                 continue
             cache.set(cache_key, True, timeout=10)
 
-            # 🔹 3. Resolve account + tenant
+            # 3. Resolve account + tenant
             try:
                 account = ChannelAccount.objects.get(subscription_id=subscription_id)
             except ChannelAccount.DoesNotExist:
@@ -477,11 +584,8 @@ class TeamMemberViewSet(viewsets.ModelViewSet):
         team_inboxes = data.get("teamInboxes", [])
         send_invite = data.get("sendInvite", False)
 
-        print("\n🚀 [TeamMember CREATE] Starting process")
-        print("👉 Incoming data:", json.dumps(data, indent=2))
 
         if not all([email, first_name, last_name, role, tenant_id]):
-            print("⚠️ Missing required fields!")
             return Response({"detail": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Create or reuse user
@@ -493,37 +597,27 @@ class TeamMemberViewSet(viewsets.ModelViewSet):
                 "username": email,
             },
         )
-        print(f"ℹ️ User {'created' if created else 'exists'}: {user.email}")
 
         # If user newly created, set password to "1"
         if created:
             user.set_password("123456")
             user.save()
-            print(f"🔑 Set default password for new user {user.email}")
 
         # Ensure teammate not duplicated in tenant
         if TeamMember.objects.filter(user=user, user__tenants__id=tenant_id).exists():
-            print(f"⚠️ User {user.email} already a teammate in tenant {tenant_id}")
             return Response({"detail": "User already a teammate in this tenant"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Create team member
         team_member = TeamMember.objects.create(user=user, role=role, is_active=True)
-        print(f"🆕 Created TeamMember ID={team_member.id} for user={user.email}")
 
         # Add user → tenant
         user.tenants.add(tenant_id)
-        print(f"📦 Added user {user.email} to tenant {tenant_id}")
-
         # Assign inboxes
         if team_inboxes:
             team_member.team_inboxes.set(team_inboxes)
-            print(f"📮 Assigned inboxes {team_inboxes} to teammate {team_member.id}")
 
         if send_invite:
-            print(f"📧 Sending invite email to {user.email} (created={created})")
             send_invitation_email(user.email, tenant_id, created)
-
-        print(f"✅ Completed creation: TeamMember={team_member.id}, User={user.email}\n")
 
         serializer = self.get_serializer(team_member)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -535,8 +629,6 @@ class TeamMemberViewSet(viewsets.ModelViewSet):
         team_member = self.get_object()
         data = request.data
 
-        print(f"\n👉 [TeamMember UPDATE] Request for ID={team_member.id}")
-        print("📥 Incoming data:", json.dumps(data, indent=2))
 
         # --- Update related User ---
         user = team_member.user
@@ -546,16 +638,15 @@ class TeamMemberViewSet(viewsets.ModelViewSet):
 
         if first_name:
             user.first_name = first_name
-            print(f"✏️ Updated first_name → {first_name}")
+            
         if last_name:
             user.last_name = last_name
-            print(f"✏️ Updated last_name → {last_name}")
+
         if email and email != user.email:
             # Prevent duplicate emails
             if User.objects.exclude(id=user.id).filter(email=email).exists():
-                print(f"⚠️ Email {email} already in use by another user")
                 return Response({"detail": "Email already in use"}, status=status.HTTP_400_BAD_REQUEST)
-            print(f"✏️ Updated email → {email}")
+            
             user.email = email
             user.username = email  # keep username aligned with email
         user.save()
@@ -566,10 +657,9 @@ class TeamMemberViewSet(viewsets.ModelViewSet):
 
         if role:
             team_member.role = role
-            print(f"✏️ Updated role → {role}")
+
         if is_active is not None:
             team_member.is_active = is_active
-            print(f"✏️ Updated is_active → {is_active}")
 
         team_member.save()
 
@@ -577,9 +667,7 @@ class TeamMemberViewSet(viewsets.ModelViewSet):
         team_inboxes = data.get("teamInboxes")
         if team_inboxes is not None:
             team_member.team_inboxes.set(team_inboxes)
-            print(f"📮 Updated inboxes → {team_inboxes}")
 
-        print(f"✅ Completed update: TeamMember={team_member.id}, User={user.email}\n")
 
         serializer = self.get_serializer(team_member)
         return Response(serializer.data)
@@ -589,16 +677,13 @@ class TeamMemberViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         team_member = self.get_object()
 
-        print(f"🗑️ Deleting TeamMember {team_member.id} for user {team_member.user.email}")
 
         # Optional tenant removal
         tenant_id = request.query_params.get("tenant_id")
         if tenant_id:
             team_member.user.tenants.remove(int(tenant_id))
-            print(f"📦 Removed {team_member.user.email} from tenant {tenant_id}")
 
         team_member.delete()
-        print(f"✅ Deleted TeamMember {team_member.id}")
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -643,11 +728,6 @@ class TagViewSet(viewsets.ModelViewSet):
     serializer_class = TagSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-
-# class CommentViewSet(viewsets.ModelViewSet):
-#     queryset = Comment.objects.all()
-#     serializer_class = CommentSerializer
-#     permission_classes = [permissions.IsAuthenticated]
 
 class CommentViewSet(viewsets.ModelViewSet):
     queryset = Comment.objects.all()

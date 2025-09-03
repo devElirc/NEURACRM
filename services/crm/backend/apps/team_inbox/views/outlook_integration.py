@@ -27,7 +27,7 @@ def outlook_callback(request):
         if not code or not inbox_name:
             return JsonResponse({"error": "Missing code or inboxName"}, status=400)
 
-        # 1️⃣ Exchange code for tokens
+        # Exchange code for tokens
         token_data = exchange_code_for_outlook_token(code)
         access_token = token_data.get("access_token")
         refresh_token = token_data.get("refresh_token")
@@ -36,12 +36,12 @@ def outlook_callback(request):
         if not access_token:
             return JsonResponse({"error": "No access_token returned"}, status=500)
 
-        # 2️⃣ Fetch user identifier
+        #  Fetch user identifier
         identifier = get_outlook_user_email(access_token)
         if not identifier:
             return JsonResponse({"error": "Could not fetch Outlook identifier"}, status=500)
 
-        # 3️⃣ Resolve tenant
+        #  Resolve tenant
         tenant = getattr(request, "tenant", None)
         if not tenant:
             return JsonResponse({"error": "Tenant not found"}, status=400)
@@ -70,7 +70,7 @@ def outlook_callback(request):
                 },
             )
 
-        # 4️⃣ Start subscription
+        #  Start subscription
         service = OutlookService(channel_account)
         subscription = service.start_subscription(settings.OUTLOOK_WEBHOOK_URL)
 
@@ -93,7 +93,6 @@ def outlook_callback(request):
 
 
 def exchange_code_for_outlook_token(code):
-    print("   🔄 Requesting Outlook token from Microsoft...")
     response = requests.post("https://login.microsoftonline.com/common/oauth2/v2.0/token", data={
         "code": code,
         "client_id": settings.OUTLOOK_CLIENT_ID,
@@ -101,19 +100,15 @@ def exchange_code_for_outlook_token(code):
         "redirect_uri": settings.OUTLOOK_REDIRECT_URI,
         "grant_type": "authorization_code",
     })
-    print("   🌐 Token request status:", response.status_code)
     response.raise_for_status()
     return response.json()
 
 
 def get_outlook_user_email(access_token):
-    print("   📡 Fetching user profile from Microsoft Graph...")
     response = requests.get(
         "https://graph.microsoft.com/v1.0/me",
         headers={"Authorization": f"Bearer {access_token}"}
     )
-    print("   🌐 Profile request status:", response.status_code)
     response.raise_for_status()
     profile = response.json()
-    print("   📄 Profile data:", profile)
     return profile.get("mail") or profile.get("userPrincipalName")

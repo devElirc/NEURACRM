@@ -59,7 +59,7 @@ export function AuthPage() {
     setError('');
 
     try {
-      const result = await register(data); // make sure your `useAuth().register` handles companyEmail
+      const result = await register(data); 
       if (!result.success) {
         setError(result.error || 'Registration failed');
       }

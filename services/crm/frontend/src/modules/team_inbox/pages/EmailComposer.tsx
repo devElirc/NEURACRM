@@ -61,14 +61,6 @@ export function EmailComposer({
     htmlContent: ''
   });
 
-  // const [formData, setFormData] = useState({
-  //   to: to || 'develirc@gmail.com',
-  //   cc: '',
-  //   bcc: '',
-  //   subject: isReply && !subject.startsWith('Re:') ? `Re: ${subject}` : (subject || 'Test Subject'),
-  //   content: 'Hello,\n\nThis is a default message.',
-  //   htmlContent: '<p>Hello,<br><br>This is a default message.</p>'
-  // });
 
   const [showCcBcc, setShowCcBcc] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -94,8 +86,6 @@ export function EmailComposer({
         isReply,
         threadId
       };
-
-      console.log("send")
 
       await onSend(emailData);
     } catch (error) {
@@ -123,7 +113,7 @@ export function EmailComposer({
   };
 
   const insertSignature = () => {
-    const signature = user?.signature || `\n\nBest regards,\n${user?.full_name}\n${user?.company}`;
+    const signature = user?.signature || `\n\nBest regards,\n${user?.full_name}\n${user?.email}`;
     setFormData(prev => ({
       ...prev,
       content: prev.content + signature

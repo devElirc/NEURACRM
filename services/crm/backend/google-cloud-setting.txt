@@ -1,0 +1,56 @@
+ STEP 1: Create Pub/Sub in Google Cloud
+ Go to Google Cloud Console
+
+ Create a Project
+
+ Enable these APIs:
+
+Gmail API
+
+Pub/Sub API
+
+ Create a Pub/Sub Topic
+
+Go to Pub/Sub > Topics
+
+Click "Create Topic"
+
+Name: inbox-notify (or anything)
+
+It will look like this:
+projects/your-project-id/topics/inbox-notify
+
+ Give Gmail Permission to Publish
+
+Gmail needs permission to send messages to your topic.
+
+Go to IAM > IAM & Admin > IAM
+
+Click “+ Add”
+
+Add this email:
+
+gmail-api-push@system.gserviceaccount.com
+
+
+Role: Pub/Sub Publisher
+
+ This allows Gmail to push to your topic.
+
+ Create a Subscription
+
+Go to Pub/Sub > Subscriptions
+
+Click "Create Subscription"
+
+Topic: inbox-notify
+
+Type: Push
+
+Endpoint URL:
+ https://yourdomain.com/gmail/notification/
+(We’ll build this Django webhook soon)
+
+Save
+
+

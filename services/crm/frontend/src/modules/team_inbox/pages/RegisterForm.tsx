@@ -27,15 +27,7 @@ export function RegisterForm({ onRegister, onSwitchToLogin, isLoading = false }:
     confirmPassword: '',
   });
 
-//   const [formData, setFormData] = useState({
-//   firstName: 'John',
-//   lastName: 'Doe',
-//   email: 'john@example.com',
-//   companyEmail: 'john@acmecorp.com',
-//   company: 'AcmeCorp',
-//   password: 'SecurePass123!',
-//   confirmPassword: 'SecurePass123!',
-// });
+
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);

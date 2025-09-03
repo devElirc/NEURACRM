@@ -8,3 +8,6 @@ channels
 daphne
 
 pip install openai
+
+pip install markdown
+
