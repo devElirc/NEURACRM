@@ -1,363 +1,547 @@
-import React, { useState, useRef } from 'react';
-import { useAuth } from '../../../auth/AuthProvider'
+import React, { useState, useRef, useEffect } from "react";
+import { useAuth } from "../../../auth/AuthProvider";
+import { EmailData, Message } from "../types";
 import {
   Send,
   Paperclip,
-  Image,
-  Smile,
-  AtSign,
   X,
+  Minimize2,
+  Maximize2,
   Bold,
   Italic,
   Underline,
-  Link,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
   List,
-  ListOrdered,
-  Quote,
-  Code,
-  Maximize2,
-  Minimize2
-} from 'lucide-react';
+  AlignLeft,
+} from "lucide-react";
+import { Button } from "./ui/Button";
 
 interface EmailComposerProps {
-  to?: string;
-  subject?: string;
   onSend: (emailData: EmailData) => void;
   onCancel: () => void;
-  isReply?: boolean;
-  threadId?: string;
-}
-
-interface EmailData {
-  to: string[];
-  cc: string[];
-  bcc: string[];
-  subject: string;
-  content: string;
-  htmlContent: string;
-  attachments: File[];
-  isReply: boolean;
-  threadId?: string;
+  replyTo?: {
+    threadId: string;
+    subject: string;
+    to: string[];
+  };
+  forwardMessage?: Message;
 }
 
 export function EmailComposer({
-  to = '',
-  subject = '',
   onSend,
   onCancel,
-  isReply = false,
-  threadId
+  replyTo,
+  forwardMessage,
 }: EmailComposerProps) {
   const { user } = useAuth();
-  const [formData, setFormData] = useState({
-    to: to,
-    cc: '',
-    bcc: '',
-    subject: isReply && !subject.startsWith('Re:') ? `Re: ${subject}` : subject,
-    content: '',
-    htmlContent: ''
-  });
-
-
-  const [showCcBcc, setShowCcBcc] = useState(false);
+  const [to, setTo] = useState<string[]>(replyTo?.to || []);
+  const [cc, setCc] = useState<string[]>([]);
+  const [bcc, setBcc] = useState<string[]>([]);
+  const [subject, setSubject] = useState(replyTo?.subject || "");
+  const [content, setContent] = useState("");
+  const [htmlContent, setHtmlContent] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showCc, setShowCc] = useState(false);
+  const [showBcc, setShowBcc] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const [isSending, setIsSending] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
+  // Prefill for forward
+  useEffect(() => {
+    if (forwardMessage) {
+      setSubject(`Fwd: ${forwardMessage.subject}`);
+
+      const forwardBlockHtml = `
+        <div style="border-left:2px solid #ccc; margin:16px 0; padding-left:12px; color:#555;">
+          <div style="font-size:13px; margin-bottom:8px;">
+            ---------- Forwarded message ----------<br/>
+            <b>From:</b> ${forwardMessage.from.name} &lt;${forwardMessage.from.email}&gt;<br/>
+            <b>Date:</b> ${forwardMessage.timestamp.toLocaleString()}<br/>
+            <b>Subject:</b> ${forwardMessage.subject}<br/>
+            <b>To:</b> ${forwardMessage.to
+          .map((t) => `${t.name} &lt;${t.email}&gt;`)
+          .join(", ")}
+          </div>
+          <div>${forwardMessage.htmlContent || forwardMessage.content}</div>
+        </div>
+      `;
+
+      const forwardBlockText = `
+---------- Forwarded message ----------
+From: ${forwardMessage.from.name} <${forwardMessage.from.email}>
+Date: ${forwardMessage.timestamp.toLocaleString()}
+Subject: ${forwardMessage.subject}
+To: ${forwardMessage.to.map((t) => `${t.name} <${t.email}>`).join(", ")}
+
+${forwardMessage.content}
+      `;
+
+      setContent((prev) =>
+        prev ? `${prev}\n\n${forwardBlockText}` : forwardBlockText
+      );
+      setHtmlContent((prev) =>
+        prev ? `${prev}<br/><br/>${forwardBlockHtml}` : forwardBlockHtml
+      );
+
+      if (forwardMessage.attachments?.length) {
+        setAttachments(forwardMessage.attachments as unknown as File[]);
+      }
+    }
+  }, [forwardMessage]);
+
   const handleSend = async () => {
-    if (!formData.to.trim() || !formData.content.trim()) return;
+    if (!to.length || !subject.trim() || !content.trim()) return;
 
     setIsSending(true);
 
-    try {
-      const emailData: EmailData = {
-        to: formData.to.split(',').map(email => email.trim()).filter(Boolean),
-        cc: formData.cc.split(',').map(email => email.trim()).filter(Boolean),
-        bcc: formData.bcc.split(',').map(email => email.trim()).filter(Boolean),
-        subject: formData.subject,
-        content: formData.content,
-        htmlContent: contentRef.current?.innerHTML || formData.content,
-        attachments,
-        isReply,
-        threadId
-      };
+    const emailData: EmailData = {
+      to,
+      cc,
+      bcc,
+      subject,
+      content,
+      htmlContent,
+      attachments,
+      isReply: !!replyTo,
+      threadId: replyTo?.threadId,
+    };
 
+    try {
       await onSend(emailData);
-    } catch (error) {
-      console.error('Failed to send email:', error);
+    } catch (err) {
+      console.error("Failed to send email:", err);
     } finally {
       setIsSending(false);
     }
   };
 
-  const handleFileAttachment = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    setAttachments(prev => [...prev, ...files]);
+  const addRecipient = (field: "to" | "cc" | "bcc", email: string) => {
+    if (!email.trim()) return;
+    const setter = field === "to" ? setTo : field === "cc" ? setCc : setBcc;
+    const current = field === "to" ? to : field === "cc" ? cc : bcc;
+    if (!current.includes(email)) setter([...current, email]);
+  };
+
+  const removeRecipient = (field: "to" | "cc" | "bcc", email: string) => {
+    const setter = field === "to" ? setTo : field === "cc" ? setCc : setBcc;
+    const current = field === "to" ? to : field === "cc" ? cc : bcc;
+    setter(current.filter((r) => r !== email));
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setAttachments((prev) => [...prev, ...files]);
   };
 
   const removeAttachment = (index: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== index));
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  const formatText = (command: string) => {
+    document.execCommand(command, false);
   };
 
-  const insertSignature = () => {
-    const signature = user?.signature || `\n\nBest regards,\n${user?.full_name}\n${user?.email}`;
-    setFormData(prev => ({
-      ...prev,
-      content: prev.content + signature
-    }));
-  };
-
-  return (
-    <div className={`bg-white border rounded-lg shadow-lg ${isFullscreen ? 'fixed inset-4 z-50' : ''}`}>
-      <div className="border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-medium text-gray-900">
-            {isReply ? 'Reply' : 'New Message'}
+  if (isMinimized) {
+    return (
+      <div className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg w-80">
+        <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+            {replyTo ? "Reply" : forwardMessage ? "Forward" : "New Message"}
           </h3>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              {isFullscreen ? (
-                <Minimize2 className="h-5 w-5" />
-              ) : (
-                <Maximize2 className="h-5 w-5" />
-              )}
-            </button>
-            <button
-              onClick={onCancel}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="p-4 space-y-3">
-        {/* From Field */}
-        <div className="flex items-center space-x-3">
-          <label className="text-sm font-medium text-gray-700 w-12">From:</label>
-          <div className="flex-1">
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-900">{user?.email}</span>
-              <span className="text-xs text-gray-500">({user?.full_name})</span>
-            </div>
-          </div>
-        </div>
-
-        {/* To Field */}
-        <div className="flex items-center space-x-3">
-          <label className="text-sm font-medium text-gray-700 w-12">To:</label>
-          <input
-            type="text"
-            value={formData.to}
-            onChange={(e) => setFormData(prev => ({ ...prev, to: e.target.value }))}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="recipient@example.com"
-          />
-          {!showCcBcc && (
-            <button
-              onClick={() => setShowCcBcc(true)}
-              className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
-            >
-              Cc/Bcc
-            </button>
-          )}
-        </div>
-
-        {/* CC/BCC Fields */}
-        {showCcBcc && (
-          <>
-            <div className="flex items-center space-x-3">
-              <label className="text-sm font-medium text-gray-700 w-12">Cc:</label>
-              <input
-                type="text"
-                value={formData.cc}
-                onChange={(e) => setFormData(prev => ({ ...prev, cc: e.target.value }))}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="cc@example.com"
-              />
-            </div>
-            <div className="flex items-center space-x-3">
-              <label className="text-sm font-medium text-gray-700 w-12">Bcc:</label>
-              <input
-                type="text"
-                value={formData.bcc}
-                onChange={(e) => setFormData(prev => ({ ...prev, bcc: e.target.value }))}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="bcc@example.com"
-              />
-            </div>
-          </>
-        )}
-
-        {/* Subject Field */}
-        <div className="flex items-center space-x-3">
-          <label className="text-sm font-medium text-gray-700 w-12">Subject:</label>
-          <input
-            type="text"
-            value={formData.subject}
-            onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Enter subject"
-          />
-        </div>
-
-        {/* Formatting Toolbar */}
-        <div className="border-t border-b border-gray-200 py-2">
           <div className="flex items-center space-x-1">
-            <button className="p-2 hover:bg-gray-100 rounded transition-colors">
-              <Bold className="h-4 w-4 text-gray-600" />
-            </button>
-            <button className="p-2 hover:bg-gray-100 rounded transition-colors">
-              <Italic className="h-4 w-4 text-gray-600" />
-            </button>
-            <button className="p-2 hover:bg-gray-100 rounded transition-colors">
-              <Underline className="h-4 w-4 text-gray-600" />
-            </button>
-            <div className="w-px h-6 bg-gray-300 mx-2" />
-            <button className="p-2 hover:bg-gray-100 rounded transition-colors">
-              <AlignLeft className="h-4 w-4 text-gray-600" />
-            </button>
-            <button className="p-2 hover:bg-gray-100 rounded transition-colors">
-              <AlignCenter className="h-4 w-4 text-gray-600" />
-            </button>
-            <button className="p-2 hover:bg-gray-100 rounded transition-colors">
-              <AlignRight className="h-4 w-4 text-gray-600" />
-            </button>
-            <div className="w-px h-6 bg-gray-300 mx-2" />
-            <button className="p-2 hover:bg-gray-100 rounded transition-colors">
-              <List className="h-4 w-4 text-gray-600" />
-            </button>
-            <button className="p-2 hover:bg-gray-100 rounded transition-colors">
-              <ListOrdered className="h-4 w-4 text-gray-600" />
-            </button>
-            <button className="p-2 hover:bg-gray-100 rounded transition-colors">
-              <Quote className="h-4 w-4 text-gray-600" />
-            </button>
-            <button className="p-2 hover:bg-gray-100 rounded transition-colors">
-              <Link className="h-4 w-4 text-gray-600" />
-            </button>
-            <button className="p-2 hover:bg-gray-100 rounded transition-colors">
-              <Code className="h-4 w-4 text-gray-600" />
-            </button>
+            <button onClick={() => setIsMinimized(false)} className="p-1"><Maximize2 className="w-4 h-4" /></button>
+            <button onClick={onCancel} className="p-1"><X className="w-4 h-4" /></button>
           </div>
         </div>
-
-        {/* Content Area */}
-        <div>
-          <div
-            ref={contentRef}
-            contentEditable
-            className="w-full min-h-[200px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            style={{ whiteSpace: 'pre-wrap' }}
-            onInput={(e) => {
-              const target = e.target as HTMLDivElement;
-              setFormData(prev => ({
-                ...prev,
-                content: target.textContent || '',
-                htmlContent: target.innerHTML
-              }));
-            }}
-          // placeholder="Type your message..."
-          />
+        <div className="p-3">
+          <p className="text-sm text-gray-600 dark:text-gray-300 truncate">To: {to.join(", ")}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-300 truncate">Subject: {subject}</p>
         </div>
-
-        {/* Attachments */}
-        {attachments.length > 0 && (
-          <div className="border border-gray-200 rounded-md p-3">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Attachments ({attachments.length})</h4>
-            <div className="space-y-2">
-              {attachments.map((file, index) => (
-                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                  <div className="flex items-center space-x-2">
-                    <Paperclip className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm text-gray-700">{file.name}</span>
-                    <span className="text-xs text-gray-500">({formatFileSize(file.size)})</span>
-                  </div>
-                  <button
-                    onClick={() => removeAttachment(index)}
-                    className="text-red-500 hover:text-red-700 transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
+    );
+  }
 
-      {/* Footer */}
-      <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-        <div className="flex items-center space-x-3">
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            onChange={handleFileAttachment}
-            className="hidden"
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-            title="Attach files"
-          >
-            <Paperclip className="h-4 w-4" />
-          </button>
-          <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors" title="Insert image">
-            <Image className="h-4 w-4" />
-          </button>
-          <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors" title="Insert emoji">
-            <Smile className="h-4 w-4" />
-          </button>
-          <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors" title="Mention someone">
-            <AtSign className="h-4 w-4" />
-          </button>
-          <button
-            onClick={insertSignature}
-            className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
-          >
-            Insert signature
-          </button>
-        </div>
+//  return (
+//     <div className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-2xl flex flex-col ${isMaximized ? "fixed inset-4" : "w-full max-w-4xl"} max-h-[90vh]`}>
+//       {/* Header */}
+//       <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+//         <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+//           {replyTo ? "Reply" : forwardMessage ? "Forward" : "Compose Message"}
+//         </h3>
+//         <div className="flex items-center space-x-2">
+//           <button onClick={() => setIsMinimized(true)} className="p-2"><Minimize2 className="w-4 h-4" /></button>
+//           <button onClick={() => setIsMaximized(!isMaximized)} className="p-2"><Maximize2 className="w-4 h-4" /></button>
+//           <button onClick={onCancel} className="p-2"><X className="w-4 h-4" /></button>
+//         </div>
+//       </div>
 
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSend}
-            disabled={!formData.to.trim() || !formData.content.trim() || isSending}
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {isSending ? (
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-            ) : (
-              <Send className="h-4 w-4 mr-2" />
-            )}
-            {isSending ? 'Sending...' : 'Send'}
-          </button>
-        </div>
+//       {/* Scrollable body */}
+//       <div className="flex-1 overflow-y-auto p-4 space-y-3">
+//         {/* Recipients */}
+//         <div className="space-y-3">
+//           <div className="flex items-center">
+//             <label className="w-16 text-sm font-medium">From:</label>
+//             <div className="flex-1"><span className="text-sm">{user?.full_name} &lt;{user?.email}&gt;</span></div>
+//           </div>
+
+//           <div className="flex items-start">
+//             <label className="w-16 text-sm font-medium mt-2">To:</label>
+//             <div className="flex-1">
+//               <div className="flex flex-wrap gap-2 mb-2">
+//                 {to.map((email,i)=>(
+//                   <span key={i} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">
+//                     {email}
+//                     <button onClick={()=>removeRecipient("to",email)} className="ml-2"><X className="w-3 h-3" /></button>
+//                   </span>
+//                 ))}
+//               </div>
+//               <input type="email" placeholder="Enter email address" className="w-full px-3 py-2 border rounded-md text-sm"
+//                 onKeyPress={(e)=>{if(e.key==="Enter"){addRecipient("to", e.currentTarget.value); e.currentTarget.value="";}}}/>
+//               <div className="mt-2 flex items-center space-x-4">
+//                 <button onClick={()=>setShowCc(!showCc)} className="text-sm text-blue-600">Cc</button>
+//                 <button onClick={()=>setShowBcc(!showBcc)} className="text-sm text-blue-600">Bcc</button>
+//               </div>
+//             </div>
+//           </div>
+
+//           {showCc && <div className="flex items-start">
+//             <label className="w-16 text-sm font-medium mt-2">Cc:</label>
+//             <div className="flex-1">
+//               {cc.map((email,i)=>(
+//                 <span key={i} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-gray-100 text-gray-800">
+//                   {email}<button onClick={()=>removeRecipient("cc",email)} className="ml-2"><X className="w-3 h-3"/></button>
+//                 </span>
+//               ))}
+//               <input type="email" placeholder="Enter email address" className="w-full px-3 py-2 border rounded-md text-sm mt-2"
+//                 onKeyPress={(e)=>{if(e.key==="Enter"){addRecipient("cc", e.currentTarget.value); e.currentTarget.value="";}}}/>
+//             </div>
+//           </div>}
+
+//           {showBcc && <div className="flex items-start">
+//             <label className="w-16 text-sm font-medium mt-2">Bcc:</label>
+//             <div className="flex-1">
+//               {bcc.map((email,i)=>(
+//                 <span key={i} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-gray-100 text-gray-800">
+//                   {email}<button onClick={()=>removeRecipient("bcc",email)} className="ml-2"><X className="w-3 h-3"/></button>
+//                 </span>
+//               ))}
+//               <input type="email" placeholder="Enter email address" className="w-full px-3 py-2 border rounded-md text-sm mt-2"
+//                 onKeyPress={(e)=>{if(e.key==="Enter"){addRecipient("bcc", e.currentTarget.value); e.currentTarget.value="";}}}/>
+//             </div>
+//           </div>}
+
+//           <div className="flex items-center">
+//             <label className="w-16 text-sm font-medium">Subject:</label>
+//             <input type="text" value={subject} onChange={e=>setSubject(e.target.value)} placeholder="Enter subject" className="flex-1 px-3 py-2 border rounded-md text-sm"/>
+//           </div>
+//         </div>
+
+//         {/* Toolbar */}
+//         <div className="flex items-center justify-between px-0 py-2 border-b bg-gray-50">
+//           <div className="flex items-center space-x-2">
+//             <button onClick={()=>formatText("bold")}><Bold className="w-4 h-4"/></button>
+//             <button onClick={()=>formatText("italic")}><Italic className="w-4 h-4"/></button>
+//             <button onClick={()=>formatText("underline")}><Underline className="w-4 h-4"/></button>
+//             <button onClick={()=>formatText("insertUnorderedList")}><List className="w-4 h-4"/></button>
+//             <button onClick={()=>formatText("justifyLeft")}><AlignLeft className="w-4 h-4"/></button>
+//           </div>
+//           <button onClick={()=>fileInputRef.current?.click()}><Paperclip className="w-4 h-4"/></button>
+//         </div>
+
+//         {/* Content */}
+//         <div ref={contentRef} contentEditable className="w-full p-3 border rounded-md text-sm focus:outline-none min-h-[16rem]" style={{whiteSpace:"pre-wrap"}} onInput={(e)=>{
+//           const target=e.currentTarget;
+//           setContent(target.textContent||"");
+//           setHtmlContent(target.innerHTML);
+//         }} dangerouslySetInnerHTML={{__html: htmlContent}}/>
+
+//         {/* Attachments */}
+//         {attachments.length>0 && (
+//           <div className="mt-4 space-y-2">
+//             <h4 className="text-sm font-medium">Attachments</h4>
+//             {attachments.map((file,index)=>(
+//               <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-md">
+//                 <div className="flex items-center space-x-2"><Paperclip className="w-4 h-4 text-gray-400"/><span className="text-sm">{file.name}</span><span className="text-xs text-gray-500">({file.size} bytes)</span></div>
+//                 <button onClick={()=>removeAttachment(index)} className="text-red-600"><X className="w-4 h-4"/></button>
+//               </div>
+//             ))}
+//           </div>
+//         )}
+//       </div>
+
+//       {/* Footer */}
+//       <div className="flex-shrink-0 flex items-center justify-between p-4 border-t bg-gray-50">
+//         <div className="flex items-center space-x-2">
+//           <Button onClick={handleSend} disabled={!to.length || !subject.trim() || !content.trim()} isLoading={isSending}><Send className="w-4 h-4 mr-2"/>Send</Button>
+//           <Button variant="outline" onClick={onCancel}>Cancel</Button>
+//         </div>
+//         <div className="text-xs text-gray-500">Press Ctrl+Enter to send</div>
+//       </div>
+
+//       <input ref={fileInputRef} type="file" multiple onChange={handleFileUpload} className="hidden"/>
+//     </div>
+//   );
+
+
+return (
+  <div
+    className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-2xl flex flex-col max-h-[90vh] ${isMaximized ? "fixed inset-4" : "w-full max-w-4xl"
+      }`}
+  >
+    {/* Header */}
+    <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+      <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+        {replyTo ? "Reply" : forwardMessage ? "Forward" : "Compose Message"}
+      </h3>
+      <div className="flex items-center space-x-2">
+        <button onClick={() => setIsMinimized(true)} className="p-2">
+          <Minimize2 className="w-4 h-4" />
+        </button>
+        <button onClick={() => setIsMaximized(!isMaximized)} className="p-2">
+          <Maximize2 className="w-4 h-4" />
+        </button>
+        <button onClick={onCancel} className="p-2">
+          <X className="w-4 h-4" />
+        </button>
       </div>
     </div>
-  );
+
+    {/* Recipients */}
+    <div className="flex-shrink-0 p-4 space-y-3 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center">
+        <label className="w-16 text-sm font-medium">From:</label>
+        <div className="flex-1">
+          <span className="text-sm">
+            {user?.full_name} &lt;{user?.email}&gt;
+          </span>
+        </div>
+      </div>
+
+      {/* To */}
+      <div className="flex items-start">
+        <label className="w-16 text-sm font-medium mt-2">To:</label>
+        <div className="flex-1">
+          <div className="flex flex-wrap gap-2 mb-2">
+            {to.map((email, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
+              >
+                {email}
+                <button
+                  onClick={() => removeRecipient("to", email)}
+                  className="ml-2"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+          <input
+            type="email"
+            placeholder="Enter email address"
+            className="w-full px-3 py-2 border rounded-md text-sm"
+            onKeyPress={(e) => {
+              if (e.key === "Enter") {
+                addRecipient("to", e.currentTarget.value);
+                e.currentTarget.value = "";
+              }
+            }}
+          />
+          <div className="mt-2 flex items-center space-x-4">
+            <button
+              onClick={() => setShowCc(!showCc)}
+              className="text-sm text-blue-600"
+            >
+              Cc
+            </button>
+            <button
+              onClick={() => setShowBcc(!showBcc)}
+              className="text-sm text-blue-600"
+            >
+              Bcc
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* CC */}
+      {showCc && (
+        <div className="flex items-start">
+          <label className="w-16 text-sm font-medium mt-2">Cc:</label>
+          <div className="flex-1">
+            {cc.map((email, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-gray-100 text-gray-800"
+              >
+                {email}
+                <button
+                  onClick={() => removeRecipient("cc", email)}
+                  className="ml-2"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+            <input
+              type="email"
+              placeholder="Enter email address"
+              className="w-full px-3 py-2 border rounded-md text-sm mt-2"
+              onKeyPress={(e) => {
+                if (e.key === "Enter") {
+                  addRecipient("cc", e.currentTarget.value);
+                  e.currentTarget.value = "";
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* BCC */}
+      {showBcc && (
+        <div className="flex items-start">
+          <label className="w-16 text-sm font-medium mt-2">Bcc:</label>
+          <div className="flex-1">
+            {bcc.map((email, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-gray-100 text-gray-800"
+              >
+                {email}
+                <button
+                  onClick={() => removeRecipient("bcc", email)}
+                  className="ml-2"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+            <input
+              type="email"
+              placeholder="Enter email address"
+              className="w-full px-3 py-2 border rounded-md text-sm mt-2"
+              onKeyPress={(e) => {
+                if (e.key === "Enter") {
+                  addRecipient("bcc", e.currentTarget.value);
+                  e.currentTarget.value = "";
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Subject */}
+      <div className="flex items-center">
+        <label className="w-16 text-sm font-medium">Subject:</label>
+        <input
+          type="text"
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          placeholder="Enter subject"
+          className="flex-1 px-3 py-2 border rounded-md text-sm"
+        />
+      </div>
+    </div>
+
+    {/* Toolbar */}
+    <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 border-b bg-gray-50">
+      <div className="flex items-center space-x-2">
+        <button onClick={() => formatText("bold")}>
+          <Bold className="w-4 h-4" />
+        </button>
+        <button onClick={() => formatText("italic")}>
+          <Italic className="w-4 h-4" />
+        </button>
+        <button onClick={() => formatText("underline")}>
+          <Underline className="w-4 h-4" />
+        </button>
+        <button onClick={() => formatText("insertUnorderedList")}>
+          <List className="w-4 h-4" />
+        </button>
+        <button onClick={() => formatText("justifyLeft")}>
+          <AlignLeft className="w-4 h-4" />
+        </button>
+      </div>
+      <button onClick={() => fileInputRef.current?.click()}>
+        <Paperclip className="w-4 h-4" />
+      </button>
+    </div>
+
+    {/* Content & Attachments */}
+    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div
+        ref={contentRef}
+        contentEditable
+        className="w-full p-3 border rounded-md text-sm focus:outline-none"
+        style={{
+          whiteSpace: "pre-wrap",
+          minHeight: "16rem",
+          maxHeight: "32rem",
+        }}
+        onInput={(e) => {
+          const target = e.currentTarget;
+          setContent(target.textContent || "");
+          setHtmlContent(target.innerHTML);
+        }}
+        dangerouslySetInnerHTML={{ __html: htmlContent }}
+      />
+
+      {attachments.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium">Attachments</h4>
+          {attachments.map((file, index) => (
+            <div
+              key={index}
+              className="flex items-center justify-between p-2 bg-gray-50 rounded-md"
+            >
+              <div className="flex items-center space-x-2">
+                <Paperclip className="w-4 h-4 text-gray-400" />
+                <span className="text-sm">{file.name}</span>
+                <span className="text-xs text-gray-500">({file.size} bytes)</span>
+              </div>
+              <button
+                onClick={() => removeAttachment(index)}
+                className="text-red-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+
+    {/* Footer */}
+    <div className="flex-shrink-0 flex items-center justify-between p-4 border-t bg-gray-50">
+      <div className="flex items-center space-x-2">
+        <Button
+          onClick={handleSend}
+          disabled={!to.length || !subject.trim() || !content.trim()}
+          isLoading={isSending}
+        >
+          <Send className="w-4 h-4 mr-2" />
+          Send
+        </Button>
+        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+      </div>
+      <div className="text-xs text-gray-500">Press Ctrl+Enter to send</div>
+    </div>
+
+    <input
+      ref={fileInputRef}
+      type="file"
+      multiple
+      onChange={handleFileUpload}
+      className="hidden"
+    />
+  </div>
+);
+
+
 }

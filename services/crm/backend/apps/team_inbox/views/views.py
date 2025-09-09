@@ -39,10 +39,10 @@ from asgiref.sync import async_to_sync
 from ..services.gmail_service import GmailService
 from ..services.outlook_service import OutlookService
 
-from ..models import TeamMember, Inbox, ChannelAccount, Tag, Message, Comment, Task, CalendarEvent, Conversation
+from ..models import TeamMember, Inbox, ChannelAccount, Tag, Message, Comment, Notification, Task, CalendarEvent, Conversation
 from ..serializers import (
     TeamMemberSerializer, InboxSerializer, ChannelAccountSerializer,
-    TagSerializer, MessageSerializer, CommentSerializer,
+    TagSerializer, MessageSerializer, CommentSerializer, NotificationSerializer,
     TaskSerializer, CalendarEventSerializer, ConversationSerializer
 )
 
@@ -570,8 +570,6 @@ class TeamMemberViewSet(viewsets.ModelViewSet):
             qs = qs.filter(user__tenants__id=tenant_id)
         return qs
 
-    
-
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
@@ -730,27 +728,108 @@ class TagViewSet(viewsets.ModelViewSet):
 
 
 class CommentViewSet(viewsets.ModelViewSet):
-    queryset = Comment.objects.all()
+    queryset = Comment.objects.all().order_by("-created_at")
     serializer_class = CommentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        """
-        Optionally filter comments by message ID:
-        /api/comments/?message=<uuid>
-        Newest comments first.
-        """
-        queryset = super().get_queryset().order_by('-created_at')
-        message_id = self.request.query_params.get('message')
+        qs = super().get_queryset()
+        message_id = self.request.query_params.get("message")
         if message_id:
-            queryset = queryset.filter(message_id=message_id)
-        return queryset
+            qs = qs.filter(message_id=message_id)
+        return qs
+
 
     def perform_create(self, serializer):
+        # Save the comment
+        comment = serializer.save(user=self.request.user)
+
+        mentioned_users = serializer.validated_data.get("mentions", [])
+        print(f"👥 Mentioned users: {[u.email for u in mentioned_users]}")
+
+        channel_layer = get_channel_layer()
+
+        # Create notifications and send to each mentioned user
+        for u in mentioned_users:
+            notif = Notification.objects.create(
+                user=u,
+                type="comment_mention",
+                object_id=comment.id,
+                data={
+                    "comment_content": comment.content,
+                    "author": comment.user.full_name,
+                    "message_id": str(comment.message_id),
+                },
+            )
+            print(f"📨 Created Notification for {u.email}: {notif.id}")
+
+            # Prepare payload
+            payload = {
+                "id": str(notif.id),
+                "type": notif.type,
+                "object_id": str(notif.object_id),
+                "data": notif.data,
+                "is_read": notif.is_read,
+                "created_at": notif.created_at.isoformat(),
+            }
+            print(f"📤 Prepared WebSocket payload for {u.email}: {payload}")
+
+            # Send notification over WebSocket to the user's group
+            async_to_sync(channel_layer.group_send)(
+                f"user_{u.id}",
+                {
+                    "type": "notification_message",  # matches consumer method
+                    "data": payload,
+                },
+            )
+            print(f"🔔 Sent targeted notification to user_{u.id}")
+
+
+# class NotificationViewSet(viewsets.ModelViewSet):
+#     serializer_class = NotificationSerializer
+#     permission_classes = [permissions.IsAuthenticated]
+
+#     def get_queryset(self):
+#         return Notification.objects.filter(user=self.request.user)
+
+#     @action(detail=True, methods=["post"])
+#     def mark_read(self, request, pk=None):
+#         notif = self.get_object()
+#         notif.is_read = True
+#         notif.save()
+#         return Response({"status": "read"})
+
+
+class NotificationViewSet(viewsets.ModelViewSet):
+    serializer_class = NotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
         """
-        Automatically assign the logged-in user to the comment.
+        Return only notifications for the currently logged-in user
         """
-        serializer.save(user=self.request.user)
+        return Notification.objects.filter(user=self.request.user).order_by('-created_at')
+
+    @action(detail=True, methods=["post"])
+    def mark_read(self, request, pk=None):
+        """
+        Mark a single notification as read
+        """
+        notif = self.get_object()
+        if not notif.is_read:
+            notif.is_read = True
+            notif.save()
+        return Response({"status": "read"}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"])
+    def mark_all_read(self, request):
+        """
+        Mark all unread notifications as read
+        """
+        unread = Notification.objects.filter(user=request.user, is_read=False)
+        updated_count = unread.update(is_read=True)
+        return Response({"status": "all_read", "updated_count": updated_count}, status=status.HTTP_200_OK)
+
 
 
 class TaskViewSet(viewsets.ModelViewSet):

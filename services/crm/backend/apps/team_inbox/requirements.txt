@@ -1,13 +1,15 @@
-django 
-requests 
+django
+requests
 google-auth
-google-api-python-client google-auth google-auth-oauthlib
-channels_redis
+google-api-python-client
+google-auth-oauthlib
 channels
-
+channels_redis
 daphne
-
-pip install openai
-
-pip install markdown
-
+openai
+markdown
+django-filter
+django-extensions
+django-debug-toolbar
+beautifulsoup4
+whitenoise

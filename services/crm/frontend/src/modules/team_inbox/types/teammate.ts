@@ -1,5 +1,6 @@
 export interface Teammate {
   id: string;
+  userId: string;
   firstName: string;
   lastName: string;
   fullName: string;

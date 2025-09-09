@@ -3,7 +3,7 @@ from rest_framework import routers
 from .views.views import (
     gmail_notify, outlook_notify,
     TeamMemberViewSet, InboxViewSet, ChannelAccountViewSet,
-    TagViewSet, CommentViewSet, TaskViewSet, CalendarEventViewSet
+    TagViewSet, CommentViewSet, NotificationViewSet, TaskViewSet, CalendarEventViewSet
 )
 from .views.message_view import MessageViewSet
 from .views.conversations import ConversationViewSet
@@ -17,6 +17,7 @@ router.register(r'conversations', ConversationViewSet, basename='conversation')
 router.register(r'messages', MessageViewSet, basename='message')
 router.register(r'tags', TagViewSet)
 router.register(r'comments', CommentViewSet)
+router.register(r'notifications', NotificationViewSet, basename='notifications')
 router.register(r'inboxes', InboxViewSet)
 router.register(r'tasks', TaskViewSet)
 router.register(r'calendar_events', CalendarEventViewSet)

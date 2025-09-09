@@ -2,14 +2,17 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import (
     TeamMember, Inbox, ChannelAccount, Tag, Conversation,
-    Message, Attachment, InternalNote, Label, Comment, Task, CalendarEvent
+    Message, Attachment, InternalNote, Label, Comment, Notification, Task, CalendarEvent
 )
 
 User = get_user_model()
 
 
 # --- Team Member Serializer ---
+
 class TeamMemberSerializer(serializers.ModelSerializer):
+    
+    userId = serializers.UUIDField(source="user.id", read_only=True)  
     firstName = serializers.CharField(source="user.first_name", read_only=True)
     lastName = serializers.CharField(source="user.last_name", read_only=True)
     fullName = serializers.SerializerMethodField()
@@ -23,7 +26,7 @@ class TeamMemberSerializer(serializers.ModelSerializer):
     class Meta:
         model = TeamMember
         fields = [
-            "id", "firstName", "lastName", "fullName", "email", "role",
+            "id", "userId", "firstName", "lastName", "fullName", "email", "role",
             "avatar", "status", "lastSeen", "joinedDate", "teamInboxes"
         ]
 
@@ -87,15 +90,27 @@ class UserSerializer(serializers.ModelSerializer):
         return f"{obj.first_name} {obj.last_name}"
 
 
-# --- Comment Serializer ---
+
 class CommentSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)  # nested author info
+    user = UserSerializer(read_only=True)
     message = serializers.PrimaryKeyRelatedField(queryset=Message.objects.all())
+    mentions = serializers.PrimaryKeyRelatedField(  
+        queryset=User.objects.all(),
+        many=True,
+        required=False
+    )
 
     class Meta:
         model = Comment
-        fields = ['id', 'message', 'user', 'content', 'created_at']
-        read_only_fields = ['id', 'user', 'created_at']
+        fields = ["id", "message", "user", "content", "mentions", "created_at"]
+        read_only_fields = ["id", "user", "created_at"]
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ["id", "type", "object_id", "data", "is_read", "created_at"]
+        read_only_fields = ["id", "type", "object_id", "data", "created_at"]
 
 
 # --- Task Serializer ---

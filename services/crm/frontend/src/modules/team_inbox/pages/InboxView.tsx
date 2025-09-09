@@ -13,6 +13,7 @@ import toast, { Toaster } from 'react-hot-toast';
 
 import { Plus, RefreshCw, Settings, Filter } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import { useWS } from "../../../shared/hooks/WebSocketProvider";
 
 
 interface EmailData {
@@ -35,78 +36,35 @@ export function InboxView() {
   const [showSharedInboxManager, setShowSharedInboxManager] = useState(false);
   const [sidebarFilter, setSidebarFilter] = useState('inbox');
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  // const [sharedInboxes, setSharedInboxes] = useState<SharedInbox[]>(mockSharedInboxes);
   const [sharedInboxes, setSharedInboxes] = useState<SharedInbox[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [teammember, setTeammember] = useState<Teammate[]>([]);
 
-  const ws = useRef<WebSocket | null>(null);
-  const hasConnected = useRef(false);
+  const { addListener } = useWS();
 
   useEffect(() => {
-    if (!tenant?.id) return;
-    if (hasConnected.current) return;
+    const unsubscribe = addListener((data) => {
+      if (data.type === "new_conversation" && data.message?.conversation) {
+        const conv = data.message.conversation;
 
-    hasConnected.current = true;
+        setConversations((prev) => {
+          const exists = prev.find((c) => c.id === conv.id);
+          if (exists) return prev;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const backendHost = 'localhost:8000';
-    const wsUrl = `${protocol}://${backendHost}/ws/inbox/?tenant=${tenant.id}`;
+          toast.success(`🆕 New conversation: ${conv.subject}`, { duration: 5000 });
+          return [conv, ...prev];
+        });
+      } else if (data.type === "new_message" && data.message?.message) {
+        const msg = data.message.message;
 
-    ws.current = new WebSocket(wsUrl);
-
-    ws.current.onopen = () => {
-      setTimeout(() => {
-        ws.current?.send(JSON.stringify({ message: 'Hello from frontend!' }));
-      }, 100);
-    };
-
-    ws.current.onclose = (event) => {
-      console.warn(`❌ WebSocket disconnected (code: ${event.code})`);
-    };
-
-    ws.current.onerror = (error) => {
-      console.error('⚠️ WebSocket error:', error);
-    };
-
-    ws.current.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-
-        // --- Handle new conversation ---
-        if (data.type === 'new_conversation' && data.message?.conversation) {
-          const conv = data.message.conversation;
-
-          setConversations((prev) => {
-            const exists = prev.find((c) => c.id === conv.id);
-            if (exists) return prev;
-
-            toast.success(`🆕 New conversation: ${conv.subject}`, { duration: 5000 });
-            return [conv, ...prev];
-          });
-
-          // --- Handle new message ---
-        } else if (data.type === 'new_message' && data.message?.message && data.message?.conversation) {
-          const msg = data.message.message;
-
-          handleReplys(data);
-
-          toast.success(`✉️ New message from ${msg.from?.email || 'someone'}`, { duration: 5000 });
-
-        } 
-      } catch (err) {
-        console.error('❌ Failed to parse WebSocket message:', err, event.data);
+        handleReplys?.(data);
+        toast.success(`✉️ New message from ${msg.from?.email || "someone"}`);
       }
-    };
+    });
 
-    return () => {
-      ws.current?.close();
-      hasConnected.current = false; // allow reconnect on tenant change
-    };
-  }, [tenant?.id]);
-
-
+    return unsubscribe;
+  }, [addListener]);
 
   useEffect(() => {
     if (!tenant?.id || !tokens) return;
@@ -114,7 +72,7 @@ export function InboxView() {
     async function fetchConversations() {
       try {
         const res = await fetch(
-          `http://localhost:8000/api/inbox/conversations/?tenantId=${tenant.id}`,
+          `http://localhost:8000/api/inbox/conversations/?tenantId=${tenant?.id}`,
           {
             headers: {
               Authorization: `Bearer ${tokens?.access_token}`,
@@ -174,57 +132,60 @@ export function InboxView() {
 
 
 
-    useEffect(() => {
-      if (!tenant?.id || !tokens) return;
-  
-      const fetchTeammates = async () => {
-        setLoading(true);
-        try {
-          console.log("Fetching teammates for tenant:", tenant.id);
-          const res = await fetch(`http://localhost:8000/api/inbox/teammates/?tenant_id=${tenant.id}`, {
-            headers: {
-              Authorization: `Bearer ${tokens.access_token}`,
-              "Content-Type": "application/json",
-            },
-          });
-  
-          if (!res.ok) {
-            console.error("Failed response:", res.status, res.statusText);
-            throw new Error("Failed to fetch teammates");
-          }
-  
-          const data = await res.json().catch(err => {
-            console.error("Failed to parse JSON:", err);
-            return [];
-          });
-  
-          const formatted: Teammate[] = (data.results || []).map((item: any) => ({
-            id: item.id,
-            firstName: item.firstName || "",
-            lastName: item.lastName || "",
-            fullName: item.fullName || `${item.firstName || ""} ${item.lastName || ""}`.trim(),
-            email: item.email,
-            role: item.role as 'Admin' | 'Agent' | 'Viewer',
-            avatar: item.avatar || "https://placehold.co/64x64",
-            status: item.status || "Inactive",  // backend already sends "Active"/"Inactive"
-            lastSeen: item.lastSeen || "Offline",
-            joinedDate: item.joinedDate || "",
-            teamInboxes: item.teamInboxes || [],
-          }));
-  
-  
-          setTeammember(formatted);
-        } catch (err) {
-          console.error("❌ Failed to fetch teammates", err);
-        } finally {
-          setLoading(false);
+  useEffect(() => {
+    if (!tenant?.id || !tokens) return;
+
+    const fetchTeammates = async () => {
+      setLoading(true);
+      try {
+        console.log("Fetching teammates for tenant:", tenant.id);
+        const res = await fetch(`http://localhost:8000/api/inbox/teammates/?tenant_id=${tenant.id}`, {
+          headers: {
+            Authorization: `Bearer ${tokens.access_token}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!res.ok) {
+          console.error("Failed response:", res.status, res.statusText);
+          throw new Error("Failed to fetch teammates");
         }
-      };
-  
-      fetchTeammates();
-    }, [tenant, tokens]);
-  
-  
+
+        const data = await res.json().catch(err => {
+          console.error("Failed to parse JSON:", err);
+          return [];
+        });
+
+        console.log("teammates", data);
+
+        const formatted: Teammate[] = (data.results || []).map((item: any) => ({
+          id: item.id,
+          userId: item.userId,
+          firstName: item.firstName || "",
+          lastName: item.lastName || "",
+          fullName: item.fullName || `${item.firstName || ""} ${item.lastName || ""}`.trim(),
+          email: item.email,
+          role: item.role as 'Admin' | 'Agent' | 'Viewer',
+          avatar: item.avatar || "https://placehold.co/64x64",
+          status: item.status || "Inactive",  // backend already sends "Active"/"Inactive"
+          lastSeen: item.lastSeen || "Offline",
+          joinedDate: item.joinedDate || "",
+          teamInboxes: item.teamInboxes || [],
+        }));
+
+
+        setTeammember(formatted);
+      } catch (err) {
+        console.error("❌ Failed to fetch teammates", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTeammates();
+  }, [tenant, tokens]);
+
+
 
   const menuCounts = useMemo(() => {
     return {
@@ -243,7 +204,7 @@ export function InboxView() {
   }, [conversations, user?.email, user?.full_name]);
 
 
-  
+
 
   const filteredConversations = useMemo(() => {
     return conversations.filter((conv) => {
@@ -360,7 +321,7 @@ export function InboxView() {
         activeFilter={sidebarFilter}
         onFilterChange={setSidebarFilter}
         currentView="inbox"
-        onViewChange={() => {}}
+        onViewChange={() => { }}
         onCreateInbox={() => setShowSharedInboxManager(true)}
         sharedInboxes={sharedInboxesWithCounts}
         menuCounts={menuCounts}
@@ -428,23 +389,24 @@ export function InboxView() {
           </div>
 
 
-          
-        {/* Main Content Area */}
-        <div className="flex-1 flex">
-          <ConversationView
-            conversation={selectedConversation}
-            onContactSelect={setSelectedContact}
-            onSendEmail={handleSendEmail}
-            onUpdateConversation={(updatedConversation) => {
-              setConversations(prev => 
-                prev.map(conv => 
-                  conv.id === updatedConversation.id ? updatedConversation : conv
-                )
-              );
-              setSelectedConversation(updatedConversation);
-            }}
-          />
-        </div>
+
+          {/* Main Content Area */}
+          <div className="flex-1 flex">
+            <ConversationView
+              conversation={selectedConversation}
+              onContactSelect={setSelectedContact}
+              onSendEmail={handleSendEmail}
+              onUpdateConversation={(updatedConversation) => {
+                setConversations(prev =>
+                  prev.map(conv =>
+                    conv.id === updatedConversation.id ? updatedConversation : conv
+                  )
+                );
+                setSelectedConversation(updatedConversation);
+              }}
+              teammates={teammember}
+            />
+          </div>
         </div>
       )}
 

@@ -225,7 +225,7 @@ User = get_user_model()
 tenant = Tenant.objects.get(schema_name="main")
 
 with schema_context('main'):
-    user = User.objects.get(email="joshua.andrews.ckr@gmail.com")
+    user = User.objects.get(email="devhiroshi77@gmail.com")
     user.tenants.add(tenant)
     user.save()
     print(f"✅ Linked {user.email} to tenant {tenant.schema_name}")
@@ -283,7 +283,7 @@ else:
 
 # Step 3: Create or get the ngrok domain
 ngrok_domain, created_domain = Domain.objects.get_or_create(
-    domain='8e4f728caf90.ngrok-free.app',
+    domain='5d94efa70c36.ngrok-free.app',
     tenant=main_tenant,
     defaults={'is_primary': False}
 )
@@ -298,11 +298,55 @@ else:
 
 
 from django_tenants.utils import schema_context
-from apps.team_inbox.models import Conversation, Message
+from apps.team_inbox.models import Conversation, Message, Inbox, ChannelAccount, TeamMember
 
 with schema_context('main'):
     Message.objects.all().delete()
     Conversation.objects.all().delete()
+    Inbox.objects.all().delete()
+    ChannelAccount.objects.all().delete()
+    TeamMember.objects.all().delete()
 
 print("✅ Deleted all records in the 'main' schema.")
+
+
+
+from django_tenants.utils import schema_context
+from apps.core.models import Client, Domain, User, TenantEmailMapping
+
+with schema_context('public'):
+    # Respect model dependencies (FK / M2M)
+    TenantEmailMapping.objects.all().delete()
+    User.objects.all().delete()
+    Domain.objects.all().delete()
+    Client.objects.all().delete()
+
+print("✅ Deleted all records in the 'public' schema from apps.core.models.")
+
+
+
+
+from django.db import connection
+from django_tenants.utils import schema_context
+
+tables = [
+    "core_user_tenants",
+    "core_tenantemailmapping",
+    "core_domain",
+    "core_user",
+    "core_client",
+]
+
+with schema_context("public"):
+    with connection.cursor() as cursor:
+        for table in tables:
+            try:
+                cursor.execute(f'TRUNCATE TABLE "{table}" CASCADE;')
+                print(f"✅ Truncated {table} (all rows deleted, FKs cascaded)")
+            except Exception as e:
+                print(f"⚠️ Skipped {table} (reason: {e})")
+
+print("🎉 Finished wiping all records in public schema (apps.core.models).")
+
+
 

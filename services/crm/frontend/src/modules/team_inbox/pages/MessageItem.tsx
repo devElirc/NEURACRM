@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from './ui/Button';
+import { Teammate } from '../types/teammate';
 
 interface MessageItemProps {
   conversationId: string;
@@ -32,6 +33,7 @@ interface MessageItemProps {
   onAddComment: (messageId: string, content: string, attachments?: File[], mentions?: string[]) => void;
   comments: Comment[];
   onSendEmail: (emailData: EmailData) => void;
+  teammates: Teammate[];
 }
 
 export function MessageItem({
@@ -45,7 +47,8 @@ export function MessageItem({
   onForward,
   onAddComment,
   comments,
-  onSendEmail
+  onSendEmail,
+  teammates
 }: MessageItemProps) {
   const { user } = useAuth();
   const [showReplyComposer, setShowReplyComposer] = useState(false);
@@ -191,9 +194,9 @@ export function MessageItem({
               <Button variant="ghost" size="sm" onClick={() => setShowReplyComposer(true)}>
                 <ReplyAll className="w-4 h-4 mr-2" /> Reply All
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => onForward(message)}>
+              {/* <Button variant="ghost" size="sm" onClick={() => onForward(message)}>
                 <Forward className="w-4 h-4 mr-2" /> Forward
-              </Button>
+              </Button> */}
             </div>
 
             <div className="flex items-center space-x-2">
@@ -248,6 +251,7 @@ export function MessageItem({
       {showComments && (
         <CommentSection
           comments={messageComments}
+          teammates={teammates}
           onAddComment={handleAddComment}
           isCollapsed={commentsCollapsed}
           onToggleCollapse={() => setCommentsCollapsed(!commentsCollapsed)}

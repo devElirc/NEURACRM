@@ -4,6 +4,8 @@ import { useAuth } from '../../../auth/AuthProvider';
 import { Conversation, Contact, Message, Comment, Attachment } from '../types';
 import { MessageItem } from './MessageItem';
 import { Teammate } from '../types/teammate';
+import { EmailComposer } from './EmailComposer';
+import { InlineReplyComposer } from './InlineReplyComposer';
 
 import {
   Mail,
@@ -19,32 +21,35 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { Button } from './ui/Button';
-import { InlineReplyComposer } from './InlineReplyComposer';
 
 interface ConversationViewProps {
   conversation: Conversation | null;
   onContactSelect?: (contact: Contact) => void;
   onSendEmail: (emailData: any) => void;
   onUpdateConversation: (conversation: Conversation) => void;
+  teammates: Teammate[];
 }
 
 export function ConversationView({
   conversation,
   onContactSelect,
   onSendEmail,
-  onUpdateConversation
+  onUpdateConversation,
+  teammates
 }: ConversationViewProps) {
+  const { user, tokens } = useAuth();
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   const [comments, setComments] = useState<Comment[]>([]);
   const [showNewMessageComposer, setShowNewMessageComposer] = useState(false);
   const [showAssignDropdown, setShowAssignDropdown] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
+
+  const [showForwardComposer, setShowForwardComposer] = useState(false);
+  const [forwardMessage, setForwardMessage] = useState<Message | null>(null);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const { user, tokens, tenant } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [teammates, setTeammates] = useState<Teammate[]>([]);
-
+  // Fetch comments for all messages
   useEffect(() => {
     if (!conversation) return;
 
@@ -97,59 +102,9 @@ export function ConversationView({
     };
 
     fetchAllComments();
-  }, [conversation,tokens]);
+  }, [conversation, tokens]);
 
 
-  useEffect(() => {
-    if (!tenant?.id || !tokens) return;
-
-    const fetchTeammates = async () => {
-      setLoading(true);
-      try {
-        console.log("Fetching teammates for tenant:", tenant.id);
-        const res = await fetch(`http://localhost:8000/api/inbox/teammates/?tenant_id=${tenant.id}`, {
-          headers: {
-            Authorization: `Bearer ${tokens.access_token}`,
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (!res.ok) {
-          console.error("Failed response:", res.status, res.statusText);
-          throw new Error("Failed to fetch teammates");
-        }
-
-        const data = await res.json().catch(err => {
-          console.error("Failed to parse JSON:", err);
-          return [];
-        });
-
-
-        const formatted: Teammate[] = (data.results || []).map((item: any) => ({
-          id: item.id,
-          firstName: item.firstName || "",
-          lastName: item.lastName || "",
-          fullName: item.fullName || `${item.firstName || ""} ${item.lastName || ""}`.trim(),
-          email: item.email,
-          role: item.role as 'Admin' | 'Agent' | 'Viewer',
-          avatar: item.avatar || "https://placehold.co/64x64",
-          status: item.status || "Inactive",  // backend already sends "Active"/"Inactive"
-          lastSeen: item.lastSeen || "Offline",
-          joinedDate: item.joinedDate || "",
-          teamInboxes: item.teamInboxes || [],
-        }));
-
-
-        setTeammates(formatted);
-      } catch (err) {
-        console.error("❌ Failed to fetch teammates", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTeammates();
-  }, [tenant, tokens]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -349,20 +304,36 @@ export function ConversationView({
   };
 
   const handleForward = (message: Message) => {
-    // Create forward data and trigger email composer
-    const forwardData = {
-      to: [],
-      cc: [],
-      bcc: [],
-      subject: `Fwd: ${message.subject}`,
-      content: `\n\n---------- Forwarded message ----------\nFrom: ${message.from.name} <${message.from.email}>\nDate: ${message.timestamp.toLocaleString()}\nSubject: ${message.subject}\nTo: ${message.to.map(t => `${t.name} <${t.email}>`).join(', ')}\n\n${message.content}`,
-      htmlContent: `<br><br>---------- Forwarded message ----------<br>From: ${message.from.name} &lt;${message.from.email}&gt;<br>Date: ${message.timestamp.toLocaleString()}<br>Subject: ${message.subject}<br>To: ${message.to.map(t => `${t.name} &lt;${t.email}&gt;`).join(', ')}<br><br>${message.content.replace(/\n/g, '<br>')}`,
-      attachments: [],
-      isReply: false
-    };
 
-    // This will be handled by the parent component to show email composer
-    console.log('Forward message:', forwardData);
+    console.log("message:", message);
+    setForwardMessage(message);
+    setShowForwardComposer(true);
+  };
+
+  const handleSendForward = (emailData: any) => {
+    if (forwardMessage) {
+      const forwardContent = `
+---------- Forwarded message ----------
+From: ${forwardMessage.from.name} <${forwardMessage.from.email}>
+Date: ${forwardMessage.timestamp.toLocaleString()}
+Subject: ${forwardMessage.subject}
+To: ${forwardMessage.to.map(t => `${t.name} <${t.email}>`).join(', ')}
+
+${forwardMessage.content}
+      `;
+
+      const forwardData = {
+        ...emailData,
+        subject: `Fwd: ${forwardMessage.subject}`,
+        content: `${emailData.content}\n\n${forwardContent}`,
+        htmlContent: `${emailData.htmlContent}<br><br>${forwardContent.replace(/\n/g, '<br>')}`,
+        attachments: forwardMessage.attachments || []
+      };
+
+      onSendEmail(forwardData);
+      setShowForwardComposer(false);
+      setForwardMessage(null);
+    }
   };
 
   const handleAddComment = async (
@@ -402,7 +373,11 @@ export function ConversationView({
           Authorization: `Bearer ${tokens?.access_token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ message: messageId, content })
+        body: JSON.stringify({
+          message: messageId,
+          content,
+          mentions,
+        }),
       });
 
       if (!res.ok) {
@@ -412,14 +387,16 @@ export function ConversationView({
       }
 
       const data = await res.json();
-      setComments(prev => prev.map(c => c.id === tempComment.id ? { ...c, ...data } : c));
+      setComments(prev =>
+        prev.map(c => (c.id === tempComment.id ? { ...c, ...data } : c))
+      );
       return data;
-
     } catch (error) {
       console.error("💥 Failed to add comment:", error);
       throw error;
     }
   };
+
 
   const handleAssign = async (memberId: string) => {
     if (!conversation) return;
@@ -601,14 +578,14 @@ export function ConversationView({
               <Clock className="w-4 h-4 mr-2" />
               Snooze
             </Button>
-            <Button
+            {/* <Button
               variant="outline"
               size="sm"
               onClick={() => setShowNewMessageComposer(!showNewMessageComposer)}
             >
               <Send className="w-4 h-4 mr-2" />
               New Message
-            </Button>
+            </Button> */}
           </div>
 
           <div className="flex items-center space-x-2">
@@ -644,6 +621,7 @@ export function ConversationView({
             onAddComment={handleAddComment}
             comments={comments}
             onSendEmail={onSendEmail}
+            teammates={teammates}
           />
         ))}
 
@@ -671,6 +649,23 @@ export function ConversationView({
           </div>
         )}
       </div>
+
+            {/* Forward Composer Modal */}
+      {showForwardComposer && forwardMessage && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <EmailComposer
+              onSend={handleSendForward}
+              onCancel={() => {
+                setShowForwardComposer(false);
+                setForwardMessage(null);
+              }}
+              isForward={true}
+              forwardMessage={forwardMessage}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

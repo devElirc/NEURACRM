@@ -249,24 +249,53 @@ class InternalNote(models.Model):
         return f'Note by {self.author} on {self.created_at}'
 
 
-
-
 class Comment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     message = models.ForeignKey(
-        'Message',
+        "Message",
         on_delete=models.CASCADE,
-        related_name='comments'
+        related_name="comments"
     )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE
     )
     content = models.TextField()
+    mentions = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name="mentioned_in_comments",
+        blank=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"Comment by {self.user.email} on {self.message.subject}"
+
+
+class Notification(models.Model):
+    NOTIFICATION_TYPES = [
+        ("comment_mention", "Comment Mention"),
+        ("message_assigned", "Message Assigned"),
+        ("status_changed", "Status Changed"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="notifications"
+    )
+    type = models.CharField(max_length=50, choices=NOTIFICATION_TYPES)
+    object_id = models.UUIDField()  
+    data = models.JSONField(default=dict, blank=True)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.type} → {self.user.email}"
 
 
 class Task(models.Model):
