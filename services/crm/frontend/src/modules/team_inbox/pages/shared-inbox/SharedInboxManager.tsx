@@ -24,43 +24,8 @@ export function SharedInboxManager({ onClose, onCreateInbox, sharedInboxes }: Sh
   // 🔄 keep inboxList in sync with parent prop if it changes
   useEffect(() => {
     setInboxList(sharedInboxes);
-    console.log("sharedInboxes", sharedInboxes);
   }, [sharedInboxes]);
 
-  // useEffect(() => {
-  //   if (!tenant?.id || !tokens) return;
-
-  //   const fetchInboxes = async () => {
-  //     setLoading(true);
-  //     try {
-  //       const res = await fetch(`http://localhost:8000/api/inbox/inboxes/sharedinbox/`, {
-  //         headers: {
-  //           Authorization: `Bearer ${tokens.access_token}`,
-  //           'Content-Type': 'application/json',
-  //         },
-  //       });
-
-  //       if (!res.ok) throw new Error('Failed to fetch inboxes');
-  //       const data = await res.json();
-
-  //       // Convert string dates to Date objects
-  //       const inboxes: SharedInbox[] = data.map((inbox: any) => ({
-  //         ...inbox,
-  //         createdAt: new Date(inbox.createdAt),
-  //         updatedAt: new Date(inbox.updatedAt),
-  //       }));
-
-  //       setInboxList(inboxes);
-  //     } catch (err) {
-  //       console.error('❌ Failed to fetch inboxes', err);
-  //       setInboxList([]);
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
-
-  //   fetchInboxes();
-  // }, [tenant, tokens]);
 
   const handleCreateInbox = async (inboxData: Partial<SharedInbox>) => {
     if (!tenant?.id || !tokens) return;
@@ -69,7 +34,6 @@ export function SharedInboxManager({ onClose, onCreateInbox, sharedInboxes }: Sh
       const payload = {
         name: inboxData.name,
         description: inboxData.description,
-        channels: inboxData.channels, // optional
         tenantId: tenant.id,          // if backend requires tenant context
       };
 

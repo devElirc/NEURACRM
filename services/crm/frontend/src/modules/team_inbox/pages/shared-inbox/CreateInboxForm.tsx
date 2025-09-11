@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { SharedInbox } from '../../types';
 import { Button } from '../../pages/ui/Button';
-import { mockTeamMembers, mockChannels } from '../../data/mockData';
 
 interface CreateInboxFormProps {
   onSubmit: (data: Partial<SharedInbox>) => void;
@@ -19,19 +18,10 @@ export function CreateInboxForm({ onSubmit, onCancel }: CreateInboxFormProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const members = mockTeamMembers.filter(member =>
-      formData.selectedMembers.includes(member.id)
-    );
-
-    const channels = mockChannels.filter(channel =>
-      formData.selectedChannels.includes(channel.id)
-    );
 
     onSubmit({
       name: formData.name,
       description: formData.description,
-      members,
-      channels
     });
   };
 
@@ -72,7 +62,7 @@ export function CreateInboxForm({ onSubmit, onCancel }: CreateInboxFormProps) {
           />
         </div>
 
-        <div>
+        {/* <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Team Members
           </label>
@@ -117,7 +107,7 @@ export function CreateInboxForm({ onSubmit, onCancel }: CreateInboxFormProps) {
               </label>
             ))}
           </div>
-        </div>
+        </div> */}
 
         <div className="flex items-center justify-end space-x-3">
           <Button variant="outline" type="button" onClick={onCancel}>

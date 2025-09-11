@@ -194,9 +194,9 @@ export function MessageItem({
               <Button variant="ghost" size="sm" onClick={() => setShowReplyComposer(true)}>
                 <ReplyAll className="w-4 h-4 mr-2" /> Reply All
               </Button>
-              {/* <Button variant="ghost" size="sm" onClick={() => onForward(message)}>
+              <Button variant="ghost" size="sm" onClick={() => onForward(message)}>
                 <Forward className="w-4 h-4 mr-2" /> Forward
-              </Button> */}
+              </Button>
             </div>
 
             <div className="flex items-center space-x-2">

@@ -10,6 +10,15 @@ interface AddTeammateModalProps {
   teamInboxes: SharedInbox[];
 }
 
+// Define separate error type (strings for error messages)
+interface FormErrors {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  role?: string;
+  teamInboxes?: string;
+}
+
 const AddTeammateModal: React.FC<AddTeammateModalProps> = ({
   isOpen,
   onClose,
@@ -24,11 +33,10 @@ const AddTeammateModal: React.FC<AddTeammateModalProps> = ({
     teamInboxes: [],
   });
 
-  const [errors, setErrors] = useState<Partial<NewTeammate>>({});
+  const [errors, setErrors] = useState<FormErrors>({});
   const [sendInvite, setSendInvite] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-
 
   const resetForm = () => {
     setFormData({
@@ -44,7 +52,7 @@ const AddTeammateModal: React.FC<AddTeammateModalProps> = ({
 
   const handleChange = (field: keyof NewTeammate, value: string | string[]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    if (errors[field]) {
+    if (errors[field as keyof FormErrors]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
     }
   };
@@ -59,12 +67,13 @@ const AddTeammateModal: React.FC<AddTeammateModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const newErrors: Partial<NewTeammate> = {};
+    const newErrors: FormErrors = {};
     if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
     if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
-    if (formData.teamInboxes.length === 0) newErrors.teamInboxes = 'At least one team inbox must be selected';
+    if (formData.teamInboxes.length === 0)
+      newErrors.teamInboxes = 'At least one team inbox must be selected';
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -105,7 +114,8 @@ const AddTeammateModal: React.FC<AddTeammateModalProps> = ({
           </div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Invitation Sent!</h2>
           <p className="text-gray-600">
-            We've sent an invitation to <strong>{formData.email}</strong>. They'll receive an email with instructions to join your team.
+            We've sent an invitation to <strong>{formData.email}</strong>. They'll receive an email
+            with instructions to join your team.
           </p>
         </div>
       </div>
@@ -136,7 +146,9 @@ const AddTeammateModal: React.FC<AddTeammateModalProps> = ({
                 type="text"
                 value={formData.firstName || ''}
                 onChange={(e) => handleChange('firstName', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.firstName ? 'border-red-300' : 'border-gray-300'}`}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.firstName ? 'border-red-300' : 'border-gray-300'
+                }`}
                 placeholder="Enter first name"
               />
               {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
@@ -148,7 +160,9 @@ const AddTeammateModal: React.FC<AddTeammateModalProps> = ({
                 type="text"
                 value={formData.lastName || ''}
                 onChange={(e) => handleChange('lastName', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.lastName ? 'border-red-300' : 'border-gray-300'}`}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.lastName ? 'border-red-300' : 'border-gray-300'
+                }`}
                 placeholder="Enter last name"
               />
               {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
@@ -162,7 +176,9 @@ const AddTeammateModal: React.FC<AddTeammateModalProps> = ({
               type="email"
               value={formData.email}
               onChange={(e) => handleChange('email', e.target.value)}
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.email ? 'border-red-300' : 'border-gray-300'}`}
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                errors.email ? 'border-red-300' : 'border-gray-300'
+              }`}
               placeholder="teammate@company.com"
             />
             {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
@@ -192,7 +208,10 @@ const AddTeammateModal: React.FC<AddTeammateModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-3">Team Inboxes</label>
             <div className="space-y-2 max-h-40 overflow-y-auto">
               {teamInboxes.map((inbox) => (
-                <label key={inbox.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+                <label
+                  key={inbox.id}
+                  className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
+                >
                   <input
                     type="checkbox"
                     checked={formData.teamInboxes.includes(inbox.id)}
@@ -221,7 +240,10 @@ const AddTeammateModal: React.FC<AddTeammateModalProps> = ({
               onChange={(e) => setSendInvite(e.target.checked)}
               className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
             />
-            <label htmlFor="sendInvite" className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+            <label
+              htmlFor="sendInvite"
+              className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer"
+            >
               <Send className="w-4 h-4 text-blue-600" />
               <span>Send invitation email to teammate</span>
             </label>
@@ -262,4 +284,3 @@ const AddTeammateModal: React.FC<AddTeammateModalProps> = ({
 };
 
 export default AddTeammateModal;
-

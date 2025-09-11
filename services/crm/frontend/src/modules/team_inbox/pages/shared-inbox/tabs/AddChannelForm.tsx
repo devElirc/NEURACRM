@@ -2,7 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "../../../pages/ui/Button";
 import { Globe } from "lucide-react";
 
-interface ChannelFormData {
+type ProviderType = "gmail" | "outlook" | "custom";
+
+export interface ChannelFormData {
   provider: ProviderType;
   identifier: string;
   imapHost?: string;
@@ -13,10 +15,8 @@ interface ChannelFormData {
   password?: string;
 }
 
-type ProviderType = "gmail" | "outlook" | "custom";
-
 interface AddChannelFormProps {
-  onSubmit: (data: { provider: string; identifier: string }) => void;
+  onSubmit: (data: ChannelFormData) => void;  
   onCancel: () => void;
 }
 
@@ -49,10 +49,11 @@ const ProviderSelector: React.FC<{
         key={id}
         type="button"
         onClick={() => onSelect(id)}
-        className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${selected === id
+        className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+          selected === id
             ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
             : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-          }`}
+        }`}
       >
         <Globe className="w-4 h-4 inline-block mr-2" />
         {id === "custom" ? "Custom (IMAP/SMTP)" : id[0].toUpperCase() + id.slice(1)}
@@ -114,7 +115,7 @@ export default function AddChannelForm({ onSubmit, onCancel }: AddChannelFormPro
         setFormData((prev) => ({ ...prev, identifier }));
 
         try {
-          onSubmit({ provider: formData.provider, identifier });
+          onSubmit({ ...formData, identifier });  
         } catch (err) {
           setConnectionStatus("Team Inbox creation failed.");
         }
@@ -127,7 +128,7 @@ export default function AddChannelForm({ onSubmit, onCancel }: AddChannelFormPro
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [formData.provider, onSubmit]);
+  }, [formData, onSubmit]);
 
   /** OAuth popup handler */
   const handleOAuthConnect = useCallback(() => {
@@ -138,10 +139,8 @@ export default function AddChannelForm({ onSubmit, onCancel }: AddChannelFormPro
     if (!config) return;
 
     setConnectionStatus("Connecting...");
-    setFormData((prev) => ({ ...prev, email: "" }));
 
     const redirectUri = `${window.location.origin}${config.callbackPath}`;
-
     const stateObj = { provider: formData.provider, inboxName, inboxId };
 
     const params: Record<string, string> = {
@@ -152,13 +151,11 @@ export default function AddChannelForm({ onSubmit, onCancel }: AddChannelFormPro
       state: encodeURIComponent(JSON.stringify(stateObj)),
     };
 
-    // Google-only
     if (formData.provider === "gmail") {
       params.access_type = "offline";
       params.prompt = "consent";
     }
 
-    // Outlook-only
     if (formData.provider === "outlook") {
       params.response_mode = "query";
       params.prompt = "consent";
@@ -169,7 +166,6 @@ export default function AddChannelForm({ onSubmit, onCancel }: AddChannelFormPro
     popupRef.current = window.open(url, "oauthPopup", "width=600,height=700");
     if (!popupRef.current) setConnectionStatus("Popup blocked. Please allow popups.");
   }, [formData.provider]);
-
 
   /** Handle Custom (IMAP/SMTP) submission */
   const handleCustomSubmit = useCallback(
@@ -196,7 +192,7 @@ export default function AddChannelForm({ onSubmit, onCancel }: AddChannelFormPro
         // Simulated connection
         await new Promise((res) => setTimeout(res, 800));
         setConnectionStatus("Connected successfully!");
-        onSubmit({ provider: formData.provider, identifier: formData.identifier });
+        onSubmit(formData);   // ✅ pass full ChannelFormData
         onCancel();
       } catch (err) {
         setConnectionStatus((err as Error).message);
@@ -233,8 +229,11 @@ export default function AddChannelForm({ onSubmit, onCancel }: AddChannelFormPro
 
         {connectionStatus && (
           <div
-            className={`text-sm ${connectionStatus.includes("success") ? "text-green-600" : "text-red-600"
-              }`}
+            className={`text-sm ${
+              connectionStatus.includes("success")
+                ? "text-green-600"
+                : "text-red-600"
+            }`}
           >
             {connectionStatus}
           </div>

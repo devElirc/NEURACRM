@@ -73,33 +73,6 @@ export interface EmailAccount {
 }
 
 
-
-// export interface Message {
-//   id: string;
-//   threadId: string;
-//   from: EmailAddress;
-//   to: EmailAddress[];
-//   cc?: EmailAddress[];
-//   bcc?: EmailAddress[];
-//   replyTo?: EmailAddress;
-//   subject: string;
-//   content: string;
-//   htmlContent?: string;
-//   timestamp: Date;
-//   isRead: boolean;
-//   isStarred: boolean;
-//   isDraft: boolean;
-//   messageId: string; // Email message ID
-//   inReplyTo?: string;
-//   references?: string[];
-//   attachments?: Attachment[];
-//   internalNotes?: InternalNote[];
-//   labels: Label[];
-//   priority: 'low' | 'normal' | 'high' | 'urgent';
-//   source: 'incoming' | 'outgoing' | 'internal';
-// }
-
-
 export interface Message {
   id: string;
   threadId: string;
@@ -438,6 +411,7 @@ export interface SharedInbox {
   createdAt: Date;
   updatedAt: Date;
   settings: SharedInboxSettings;
+  color?: string;
 }
 
 export interface TeamMember {

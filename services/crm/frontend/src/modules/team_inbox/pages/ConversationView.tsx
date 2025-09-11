@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from '../../../auth/AuthProvider';
-import { Conversation, Contact, Message, Comment, Attachment } from '../types';
+import { Conversation, Contact, Message, Comment, Attachment, EmailAddress } from '../types';
 import { MessageItem } from './MessageItem';
 import { Teammate } from '../types/teammate';
 import { EmailComposer } from './EmailComposer';
@@ -53,53 +53,88 @@ export function ConversationView({
   useEffect(() => {
     if (!conversation) return;
 
-    const fetchAllComments = async () => {
-      try {
-        const allComments: Comment[] = [];
+// Define the shape of your backend response for comments
+interface CommentResponse {
+  id: string;
+  message: string;
+  user: {
+    id: string;
+    full_name: string;
+    email: string;
+    avatar?: string;
+  };
+  content: string;
+  created_at: string;
+  attachments?: {
+    id: string;
+    name: string;
+    size: number;
+    type: string;
+    url: string;
+    isInline?: boolean;
+  }[];
+  mentions?: string[];
+}
 
-        for (const message of conversation.messages) {
-          const res = await fetch(
-            `http://localhost:8000/api/inbox/comments/?message=${message.id}`,
-            {
-              headers: {
-                Authorization: `Bearer ${tokens?.access_token}`,
-                "Content-Type": "application/json",
-              },
-            }
-          );
+const fetchAllComments = async () => {
+  try {
+    const allComments: Comment[] = [];
 
-          if (!res.ok) {
-            console.error('❌ Failed to fetch comments for message', message.id);
-            continue;
-          }
-
-          const data = await res.json();
-
-          // Map backend response to frontend Comment interface
-          const mappedComments: Comment[] = (data.results || []).map(c => ({
-            id: c.id,
-            messageId: c.message,
-            author: {
-              id: c.user.id,
-              name: c.user.full_name,
-              email: c.user.email,
-              avatar: c.user.avatar || 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=32&h=32&fit=crop&crop=face'
-            },
-            content: c.content,
-            timestamp: new Date(c.created_at),
-            attachments: [],
-            mentions: [],
-            isInternal: true,
-          }));
-
-          allComments.push(...mappedComments);
+    for (const message of conversation.messages) {
+      const res = await fetch(
+        `http://localhost:8000/api/inbox/comments/?message=${message.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${tokens?.access_token}`,
+            "Content-Type": "application/json",
+          },
         }
+      );
 
-        setComments(allComments);
-      } catch (error) {
-        console.error('💥 Error fetching comments:', error);
+      if (!res.ok) {
+        console.error("❌ Failed to fetch comments for message", message.id);
+        continue;
       }
-    };
+
+      const data = await res.json();
+
+      // Map backend response → frontend Comment[]
+      const mappedComments: Comment[] = (data.results as CommentResponse[] || []).map(
+        (c) => ({
+          id: c.id,
+          messageId: c.message,
+          author: {
+            id: c.user.id,
+            name: c.user.full_name,
+            email: c.user.email,
+            avatar:
+              c.user.avatar ||
+              "https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=32&h=32&fit=crop&crop=face",
+          },
+          content: c.content,
+          timestamp: new Date(c.created_at), // string → Date
+          attachments: (c.attachments || []).map((a) => ({
+            id: a.id,
+            name: a.name,
+            size: a.size,
+            type: a.type,
+            url: a.url,
+            isInline: a.isInline ?? false, // fallback
+          })),
+          mentions: c.mentions || [],
+          isInternal: true, // Adjust if backend differentiates
+        })
+      );
+
+      allComments.push(...mappedComments);
+    }
+
+    setComments(allComments);
+  } catch (error) {
+    console.error("❌ Error fetching comments:", error);
+  }
+};
+
 
     fetchAllComments();
   }, [conversation, tokens]);
@@ -153,122 +188,129 @@ export function ConversationView({
     });
   };
 
-  const handleReply = async (
-    messageId: string,
-    content: string,
-    isReplyAll: boolean = false
-  ) => {
-    const message = conversation.messages.find(m => m.id === messageId);
-    if (!message) {
-      return;
-    }
+const handleReply = async (
+  messageId: string,
+  content: string,
+  isReplyAll: boolean = false
+) => {
+  const message = conversation.messages.find(m => m.id === messageId);
+  if (!message) {
+    return;
+  }
 
-    const currentUser = { email: user?.email, name: user?.full_name };
+  // ✅ Ensure currentUser has a valid email string
+  if (!user?.email) {
+    console.error("❌ Cannot reply: current user has no email address.");
+    return;
+  }
 
-    // Build recipients
-    let toRecipients = isReplyAll
-      ? [message.from, ...message.to, ...(message.cc || [])]
-      : [message.from];
-
-    // Remove duplicates + current user
-    const unique = (list: typeof toRecipients) =>
-      list.filter(
-        (r, i, arr) =>
-          r.email !== currentUser.email &&
-          arr.findIndex(x => x.email === r.email) === i
-      );
-
-    toRecipients = unique(toRecipients);
-
-    let ccRecipients = isReplyAll
-      ? message.to.filter(t => t.email !== currentUser.email)
-      : [];
-    ccRecipients = unique(ccRecipients);
-
-    // Create local reply message (optimistic update)
-    const newMessage: Message = {
-      id: uuidv4(),
-      threadId: conversation.threadId || uuidv4(),
-      messageId: "msg-" + Date.now(),
-      from: currentUser,
-      to: toRecipients,
-      cc: ccRecipients,
-      subject: `Re: ${conversation.subject}`,
-      content,
-      timestamp: new Date(),
-      isRead: true,
-      isStarred: false,
-      isDraft: false,
-      attachments: [],
-      comments: [],
-      labels: [],
-      priority: "normal",
-      source: "outgoing",
-      inReplyTo: messageId,
-    };
-
-    const updatedConversation = {
-      ...conversation,
-      messages: [...conversation.messages, newMessage],
-      lastMessage: newMessage,
-      lastActivity: new Date(),
-      updatedAt: new Date(),
-    };
-
-    // Optimistically update UI immediately
-    onUpdateConversation(updatedConversation);
-
-    // Build payload for API
-    const payload = {
-      threadId: newMessage.threadId,
-      from_: currentUser,
-      to: toRecipients.map(t => ({
-        email: t.email,
-        name: t.name || t.email.split("@")[0],
-      })),
-      cc: ccRecipients.map(t => ({
-        email: t.email,
-        name: t.name || t.email.split("@")[0],
-      })),
-      bcc: [],
-      subject: newMessage.subject,
-      content,
-      htmlContent: content,
-      timestamp: newMessage.timestamp.toISOString(),
-      isRead: true,
-      isStarred: false,
-      isDraft: false,
-      messageId: newMessage.messageId,
-      references: [message.messageId],
-      priority: "normal",
-      source: "outgoing",
-      in_reply_to: messageId,
-    };
-
-    try {
-      const res = await fetch("http://localhost:8000/api/inbox/messages/", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${tokens?.access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        console.error("❌ Failed to send reply:", err);
-
-      } else {
-        const data = await res.json();
-        if (data?.conversation) {
-          onUpdateConversation(data.conversation);
-        }
-      }
-    } catch (err) {
-      console.error("🚨 Network error while sending reply:", err);
-    }
+  const currentUser: EmailAddress = {
+    email: user.email,
+    name: user.full_name ?? user.email.split("@")[0],
   };
+
+  // Build recipients
+  let toRecipients = isReplyAll
+    ? [message.from, ...message.to, ...(message.cc || [])]
+    : [message.from];
+
+  // Remove duplicates + current user
+  const unique = (list: typeof toRecipients) =>
+    list.filter(
+      (r, i, arr) =>
+        r.email !== currentUser.email &&
+        arr.findIndex(x => x.email === r.email) === i
+    );
+
+  toRecipients = unique(toRecipients);
+
+  let ccRecipients = isReplyAll
+    ? message.to.filter(t => t.email !== currentUser.email)
+    : [];
+  ccRecipients = unique(ccRecipients);
+
+  const newMessage: Message = {
+    id: uuidv4(),
+    threadId: conversation.threadId || uuidv4(),
+    messageId: "msg-" + Date.now(),
+    from: currentUser,
+    to: toRecipients,
+    cc: ccRecipients,
+    subject: `Re: ${conversation.subject}`,
+    content,
+    timestamp: new Date(),
+    isRead: true,
+    isStarred: false,
+    isDraft: false,
+    attachments: [],
+    comments: [],
+    labels: [],
+    priority: "normal",
+    source: "outgoing",
+    inReplyTo: messageId,
+  };
+
+  const updatedConversation = {
+    ...conversation,
+    messages: [...conversation.messages, newMessage],
+    lastMessage: newMessage,
+    lastActivity: new Date(),
+    updatedAt: new Date(),
+  };
+
+  // Optimistically update UI immediately
+  onUpdateConversation(updatedConversation);
+
+  // Build payload for API
+  const payload = {
+    threadId: newMessage.threadId,
+    from_: currentUser,
+    to: toRecipients.map(t => ({
+      email: t.email,
+      name: t.name || t.email.split("@")[0],
+    })),
+    cc: ccRecipients.map(t => ({
+      email: t.email,
+      name: t.name || t.email.split("@")[0],
+    })),
+    bcc: [],
+    subject: newMessage.subject,
+    content,
+    htmlContent: content,
+    timestamp: newMessage.timestamp.toISOString(),
+    isRead: true,
+    isStarred: false,
+    isDraft: false,
+    messageId: newMessage.messageId,
+    references: [message.messageId],
+    priority: "normal",
+    source: "outgoing",
+    in_reply_to: messageId,
+  };
+
+  try {
+    const res = await fetch("http://localhost:8000/api/inbox/messages/", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${tokens?.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      console.error("❌ Failed to send reply:", err);
+    } else {
+      const data = await res.json();
+      if (data?.conversation) {
+        onUpdateConversation(data.conversation);
+      }
+    }
+  } catch (err) {
+    console.error("🚨 Network error while sending reply:", err);
+  }
+};
 
 
   const handleNewMessage = (content: string) => {
@@ -336,66 +378,71 @@ ${forwardMessage.content}
     }
   };
 
-  const handleAddComment = async (
-    messageId: string,
-    content: string,
-    attachments?: File[],
-    mentions?: string[]
-  ) => {
-    try {
-      const tempComment: Comment = {
-        id: `temp-${Date.now()}`,
-        messageId,
-        author: {
-          id: user?.id,
-          name: user?.full_name,
-          email: user?.email,
-          avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=32&h=32&fit=crop&crop=face'
-        },
-        content,
-        timestamp: new Date(),
-        attachments: attachments?.map(file => ({
+const handleAddComment = async (
+  messageId: string,
+  content: string,
+  attachments?: File[],
+  mentions?: string[]
+) => {
+  try {
+    const tempComment: Comment = {
+      id: `temp-${Date.now()}`,
+      messageId,
+      author: {
+        id: user?.id ?? `unknown-${Date.now()}`,
+        name: user?.full_name ?? 'Unknown User',
+        email: user?.email ?? 'unknown@example.com',
+        avatar:
+          // user?.avatar ??
+          'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=32&h=32&fit=crop&crop=face',
+      },
+      content,
+      timestamp: new Date(),
+      attachments:
+        attachments?.map((file) => ({
           id: `temp-${Date.now()}`,
           name: file.name,
           size: file.size,
           type: file.type,
-          url: URL.createObjectURL(file)
+          url: URL.createObjectURL(file),
+          isInline: false, // ✅ required by Attachment
         })) || [],
-        mentions: mentions || [],
-        isInternal: true
-      };
+      mentions: mentions || [],
+      isInternal: true,
+    };
 
-      setComments(prev => [...prev, tempComment]);
+    setComments((prev) => [...prev, tempComment]);
 
-      const res = await fetch("http://localhost:8000/api/inbox/comments/", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${tokens?.access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: messageId,
-          content,
-          mentions,
-        }),
-      });
+    const res = await fetch('http://localhost:8000/api/inbox/comments/', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${tokens?.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: messageId,
+        content,
+        mentions,
+      }),
+    });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        setComments(prev => prev.filter(c => c.id !== tempComment.id));
-        throw new Error(errorData?.detail || "Failed to add comment");
-      }
-
-      const data = await res.json();
-      setComments(prev =>
-        prev.map(c => (c.id === tempComment.id ? { ...c, ...data } : c))
-      );
-      return data;
-    } catch (error) {
-      console.error("💥 Failed to add comment:", error);
-      throw error;
+    if (!res.ok) {
+      const errorData = await res.json();
+      setComments((prev) => prev.filter((c) => c.id !== tempComment.id));
+      throw new Error(errorData?.detail || 'Failed to add comment');
     }
-  };
+
+    const data = await res.json();
+    setComments((prev) =>
+      prev.map((c) => (c.id === tempComment.id ? { ...c, ...data } : c))
+    );
+    return data;
+  } catch (error) {
+    console.error('💥 Failed to add comment:', error);
+    throw error;
+  }
+};
+
 
 
   const handleAssign = async (memberId: string) => {
@@ -660,7 +707,6 @@ ${forwardMessage.content}
                 setShowForwardComposer(false);
                 setForwardMessage(null);
               }}
-              isForward={true}
               forwardMessage={forwardMessage}
             />
           </div>
