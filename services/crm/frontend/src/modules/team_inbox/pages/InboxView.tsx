@@ -14,6 +14,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import { Plus, RefreshCw, Settings, Filter } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { useWS } from "../../../shared/hooks/WebSocketProvider";
+import { getApiBaseUrl } from '../../../utils/tenant'
 
 
 interface EmailData {
@@ -66,33 +67,61 @@ export function InboxView() {
     return unsubscribe;
   }, [addListener]);
 
-  useEffect(() => {
-    if (!tenant?.id || !tokens) return;
+  // useEffect(() => {
+  //   if (!tenant?.id || !tokens) return;
 
-    async function fetchConversations() {
-      try {
-        const res = await fetch(
-          `http://localhost:8000/api/inbox/conversations/?tenantId=${tenant?.id}`,
-          {
-            headers: {
-              Authorization: `Bearer ${tokens?.access_token}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+  //   async function fetchConversations() {
+  //     try {
+  //       const res = await fetch(
+  //         `http://localhost:8000/api/inbox/conversations/?tenantId=${tenant?.id}`,
+  //         {
+  //           headers: {
+  //             Authorization: `Bearer ${tokens?.access_token}`,
+  //             'Content-Type': 'application/json',
+  //           },
+  //         }
+  //       );
 
-        if (!res.ok) throw new Error('Failed to fetch conversations');
-        const data = await res.json();
-        setConversations(Array.isArray(data.results) ? data.results : []);
-      } catch (err) {
-        console.error(err);
-        setConversations([]);
-      }
+  //       if (!res.ok) throw new Error('Failed to fetch conversations');
+  //       const data = await res.json();
+  //       setConversations(Array.isArray(data.results) ? data.results : []);
+  //     } catch (err) {
+  //       console.error(err);
+  //       setConversations([]);
+  //     }
+  //   }
+
+  //   fetchConversations();
+  // }, [tenant, tokens]);
+
+
+
+useEffect(() => {
+  if (!tenant?.id || !tokens) return
+
+  async function fetchConversations() {
+    try {
+      const res = await fetch(
+        `${getApiBaseUrl()}/api/inbox/conversations/?tenantId=${tenant?.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${tokens?.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      )
+
+      if (!res.ok) throw new Error('Failed to fetch conversations')
+      const data = await res.json()
+      setConversations(Array.isArray(data.results) ? data.results : [])
+    } catch (err) {
+      console.error('❌ fetchConversations error:', err)
+      setConversations([])
     }
+  }
 
-    fetchConversations();
-  }, [tenant, tokens]);
-
+  fetchConversations()
+}, [tenant, tokens])
 
 
   useEffect(() => {
@@ -101,7 +130,7 @@ export function InboxView() {
     const fetchInboxes = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`http://localhost:8000/api/inbox/inboxes/sharedinbox/`, {
+        const res = await fetch(`${getApiBaseUrl()}/api/inbox/inboxes/sharedinbox/`, {
           headers: {
             Authorization: `Bearer ${tokens.access_token}`,
             'Content-Type': 'application/json',
@@ -139,7 +168,7 @@ export function InboxView() {
       setLoading(true);
       try {
         console.log("Fetching teammates for tenant:", tenant.id);
-        const res = await fetch(`http://localhost:8000/api/inbox/teammates/?tenant_id=${tenant.id}`, {
+        const res = await fetch(`${getApiBaseUrl()}/api/inbox/teammates/?tenant_id=${tenant.id}`, {
           headers: {
             Authorization: `Bearer ${tokens.access_token}`,
             "Content-Type": "application/json",
@@ -251,7 +280,7 @@ export function InboxView() {
         source: 'outgoing'
       };
 
-      const res = await fetch('http://localhost:8000/api/inbox/messages/', {
+      const res = await fetch('${getApiBaseUrl()}/api/inbox/messages/', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${tokens?.access_token}`,

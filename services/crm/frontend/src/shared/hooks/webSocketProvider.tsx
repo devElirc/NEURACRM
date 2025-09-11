@@ -30,7 +30,10 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
     hasConnected.current = true;
 
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-    const backendHost = "localhost:8000";
+    const isDev = import.meta.env.MODE === "development";
+
+    const backendHost = isDev ? "127.0.0.1:8000" : window.location.host;
+
     const wsUrl = `${protocol}://${backendHost}/ws/inbox/?tenant=${tenant.id}&user_id=${user?.id}`;
 
     ws.current = new WebSocket(wsUrl);
