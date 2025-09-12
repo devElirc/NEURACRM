@@ -3,6 +3,7 @@ import { Bell, X, Check, Clock, AlertCircle } from 'lucide-react'
 import { useWS } from '../shared/hooks/WebSocketProvider'
 import { useAuth } from '../auth/AuthProvider'
 import toast, { Toaster } from 'react-hot-toast'
+import { getApiBaseUrl } from '../utils/tenant'
 
 interface Notification {
   id: string
@@ -45,7 +46,7 @@ export const NotificationDropdown: React.FC = () => {
     const fetchNotifications = async () => {
       try {
         const res = await fetch(
-          `http://localhost:8000/api/inbox/notifications/?tenantId=${tenant.id}`,
+          `${getApiBaseUrl()}/api/inbox/notifications/?tenantId=${tenant.id}`,
           {
             headers: {
               Authorization: `Bearer ${tokens.access_token}`,
@@ -107,7 +108,7 @@ export const NotificationDropdown: React.FC = () => {
   const markAsRead = async (id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
     try {
-      await fetch(`http://localhost:8000/api/inbox/notifications/${id}/mark_read/`, {
+      await fetch(`${getApiBaseUrl()}/api/inbox/notifications/${id}/mark_read/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -123,7 +124,7 @@ export const NotificationDropdown: React.FC = () => {
     const unreadIds = notifications.filter(n => !n.read).map(n => n.id)
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
     try {
-      await fetch(`http://localhost:8000/api/inbox/notifications/mark-all-read/`, {
+      await fetch(`${getApiBaseUrl()}/api/inbox/notifications/mark-all-read/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

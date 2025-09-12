@@ -8,6 +8,7 @@ import ConfirmationModal from './ConfirmationModal';
 import { Teammate, NewTeammate } from '../../types/teammate';
 import { SharedInbox } from '../../types';
 import { useAuth } from '../../../../auth/AuthProvider';
+import { getApiBaseUrl } from '../../../../utils/tenant'
 
 type TeammatesPageProps = {
   sharedInboxes: SharedInbox[];
@@ -53,7 +54,7 @@ const TeammatesPage: React.FC<TeammatesPageProps> = ({ sharedInboxes, teammember
         }),
       };
 
-      const response = await fetch('http://localhost:8000/api/inbox/teammates/', {
+      const response = await fetch(`${getApiBaseUrl()}/api/inbox/teammates/`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${tokens?.access_token}`,
@@ -83,7 +84,7 @@ const TeammatesPage: React.FC<TeammatesPageProps> = ({ sharedInboxes, teammember
   const handleSaveTeammate = async (updatedTeammate: Teammate) => {
     try {
       const response = await fetch(
-        `http://localhost:8000/api/inbox/teammates/${updatedTeammate.id}/`,
+        `${getApiBaseUrl()}/api/inbox/teammates/${updatedTeammate.id}/`,
         {
           method: 'PATCH',
           headers: {
@@ -134,7 +135,7 @@ const TeammatesPage: React.FC<TeammatesPageProps> = ({ sharedInboxes, teammember
     setConfirmModal((prev) => ({ ...prev, isLoading: true }));
 
     try {
-      const response = await fetch(`http://localhost:8000/api/inbox/teammates/${id}/`, {
+      const response = await fetch(`${getApiBaseUrl()}/api/inbox/teammates/${id}/`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${tokens?.access_token}`,

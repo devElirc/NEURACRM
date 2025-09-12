@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Conversation } from '../types';
 import { Send, Paperclip, Image, Smile, AtSign, X, Sparkles, RefreshCw, Bot, Copy, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { useAuth } from '../../../auth/AuthProvider';
+import { getApiBaseUrl } from '../../../utils/tenant'
 
 interface ComposeMessageProps {
   conversation: Conversation;
@@ -48,7 +49,7 @@ export function ComposeMessage({ conversation, onSend, onCancel }: ComposeMessag
         source: 'outgoing',
       };
 
-      const res = await fetch('http://localhost:8000/api/inbox/messages/', {
+      const res = await fetch(`${getApiBaseUrl()}/api/inbox/messages/`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${tokens?.access_token}`,
@@ -81,7 +82,7 @@ const handleGenerateAIReply = async () => {
 
   try {
     // Call backend AI endpoint
-    const res = await fetch(`http://localhost:8000/api/inbox/ai-reply/`, {
+    const res = await fetch(`${getApiBaseUrl()}/api/inbox/ai-reply/`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${tokens?.access_token}`,

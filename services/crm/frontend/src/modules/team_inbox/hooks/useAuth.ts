@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getApiBaseUrl } from '../../../utils/tenant'
 
 interface User {
   id: string;
@@ -106,7 +107,7 @@ export function useAuth() {
       if (!validateEmail(email)) return { success: false, error: 'Invalid email' };
       if (password.length < 6) return { success: false, error: 'Password too short' };
 
-      const response = await fetch("http://localhost:8000/api/login/", {
+      const response = await fetch(`${getApiBaseUrl()}/api/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -160,7 +161,7 @@ export function useAuth() {
       if (!validateEmail(data.companyEmail)) return { success: false, error: 'Invalid company email' };
       if (data.password.length < 8) return { success: false, error: 'Password must be at least 8 characters' };
 
-      const response = await fetch("http://localhost:8000/api/register/", {
+      const response = await fetch(`${getApiBaseUrl()}/api/register/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

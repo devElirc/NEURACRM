@@ -6,6 +6,7 @@ import { MessageItem } from './MessageItem';
 import { Teammate } from '../types/teammate';
 import { EmailComposer } from './EmailComposer';
 import { InlineReplyComposer } from './InlineReplyComposer';
+import { getApiBaseUrl } from '../../../utils/tenant'
 
 import {
   Mail,
@@ -82,7 +83,7 @@ const fetchAllComments = async () => {
 
     for (const message of conversation.messages) {
       const res = await fetch(
-        `http://localhost:8000/api/inbox/comments/?message=${message.id}`,
+        `${getApiBaseUrl()}/api/inbox/comments/?message=${message.id}`,
         {
           headers: {
             Authorization: `Bearer ${tokens?.access_token}`,
@@ -289,7 +290,7 @@ const handleReply = async (
   };
 
   try {
-    const res = await fetch("http://localhost:8000/api/inbox/messages/", {
+    const res = await fetch(`${getApiBaseUrl()}/api/inbox/messages/`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${tokens?.access_token}`,
@@ -413,7 +414,7 @@ const handleAddComment = async (
 
     setComments((prev) => [...prev, tempComment]);
 
-    const res = await fetch('http://localhost:8000/api/inbox/comments/', {
+    const res = await fetch('${getApiBaseUrl()}/api/inbox/comments/', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${tokens?.access_token}`,
@@ -451,7 +452,7 @@ const handleAddComment = async (
 
     try {
       const res = await fetch(
-        `http://localhost:8000/api/inbox/conversations/${conversation.id}/`,
+        `${getApiBaseUrl()}/api/inbox/conversations/${conversation.id}/`,
         {
           method: 'PATCH',
           headers: {
@@ -478,7 +479,7 @@ const handleAddComment = async (
 
     try {
       const res = await fetch(
-        `http://localhost:8000/api/inbox/conversations/${conversation.id}/`,
+        `${getApiBaseUrl()}/api/inbox/conversations/${conversation.id}/`,
         {
           method: 'PATCH',
           headers: {

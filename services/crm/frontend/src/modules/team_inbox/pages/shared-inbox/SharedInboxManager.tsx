@@ -6,6 +6,7 @@ import { CreateInboxForm } from './CreateInboxForm';
 import { InboxDetailsView } from './InboxDetailsView';
 import { InboxCard } from './InboxCard';
 import { useAuth } from '../../../../auth/AuthProvider';
+import { getApiBaseUrl } from '../../../../utils/tenant';
 
 interface SharedInboxManagerProps {
   onClose: () => void;
@@ -37,7 +38,7 @@ export function SharedInboxManager({ onClose, onCreateInbox, sharedInboxes }: Sh
         tenantId: tenant.id,          // if backend requires tenant context
       };
 
-      const response = await fetch('http://localhost:8000/api/inbox/inboxes/sharedinbox/', {
+      const response = await fetch(`${getApiBaseUrl()}/api/inbox/inboxes/sharedinbox/`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${tokens.access_token}`,

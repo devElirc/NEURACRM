@@ -16,6 +16,8 @@ import {
   X
 } from 'lucide-react';
 import { Button } from './ui/Button';
+import { getApiBaseUrl } from '../../../utils/tenant'
+
 
 // Utility: Format plain text AI reply into HTML
 const formatAIContent = (text: string) => {
@@ -94,7 +96,7 @@ export function AIReplyPanel({ conversationId, message, onSendReply, onClose }: 
     setAiReply(prev => ({ ...prev, status: 'generating' }));
 
     try {
-      const res = await fetch(`http://localhost:8000/api/inbox/ai-reply/`, {
+      const res = await fetch(`${getApiBaseUrl()}/api/inbox/ai-reply/`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${tokens?.access_token}`,

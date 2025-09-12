@@ -10,6 +10,7 @@ import { useAuth } from "../../auth/AuthProvider";
 type WSContextType = {
   ws: React.MutableRefObject<WebSocket | null>;
   addListener: (callback: (data: any) => void) => () => void;
+  ready: boolean;
 };
 
 const WSContext = createContext<WSContextType | undefined>(undefined);
@@ -19,64 +20,54 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const { tenant, user } = useAuth();
   const ws = useRef<WebSocket | null>(null);
-  const hasConnected = useRef(false);
   const listeners = useRef<((data: any) => void)[]>([]);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!tenant?.id) return;
-    if (hasConnected.current) return;
+    if (!tenant?.id || !user?.id) return;
 
-    hasConnected.current = true;
+const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+const backendHost = window.location.host; // ? always use current host
 
-    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-    const isDev = import.meta.env.MODE === "development";
+console.log("?? window.location", window.location);
+console.log("?? Backend host:", backendHost);
 
-    const backendHost = isDev ? "127.0.0.1:8000" : window.location.host;
+const wsUrl = `${protocol}://${backendHost}/ws/inbox/?tenant=${tenant.id}&user_id=${user.id}`;
+console.log("?? Connecting WebSocket to:", wsUrl);
 
-    const wsUrl = `${protocol}://${backendHost}/ws/inbox/?tenant=${tenant.id}&user_id=${user?.id}`;
-
-    ws.current = new WebSocket(wsUrl);
+ws.current = new WebSocket(wsUrl);
 
     ws.current.onopen = () => {
       setReady(true);
-
-      setTimeout(() => {
-        ws.current?.send(
-          JSON.stringify({ message: "Hello from frontend!" })
-        );
-      }, 100);
+      console.log("? WebSocket connected");
     };
 
     ws.current.onclose = (event) => {
-      console.warn(`❌ WebSocket disconnected (code: ${event.code})`);
+      console.warn(`? WebSocket disconnected (code: ${event.code})`);
       setReady(false);
-      hasConnected.current = false;
     };
 
     ws.current.onerror = (error) => {
-      console.error("⚠️ WebSocket error:", error);
+      console.error("?? WebSocket error:", error);
     };
 
     ws.current.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log("📩 Incoming WS message:", data);
-
-        listeners.current.forEach((cb) => cb(data)); // broadcast
+        console.log("?? Incoming WS message:", data);
+        listeners.current.forEach((cb) => cb(data));
       } catch (err) {
-        console.error("❌ Failed to parse WebSocket:", err, event.data);
+        console.error("? Failed to parse WS:", err, event.data);
       }
     };
 
     return () => {
-      console.log("🔌 Closing WebSocket connection");
+      console.log("?? Closing WebSocket connection");
       ws.current?.close();
       ws.current = null;
-      hasConnected.current = false;
       setReady(false);
     };
-  }, [tenant?.id]);
+  }, [tenant?.id, user?.id]);
 
   const addListener = (callback: (data: any) => void) => {
     listeners.current.push(callback);
@@ -86,7 +77,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   return (
-    <WSContext.Provider value={{ ws, addListener }}>
+    <WSContext.Provider value={{ ws, addListener, ready }}>
       {children}
     </WSContext.Provider>
   );
